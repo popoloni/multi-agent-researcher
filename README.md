@@ -25,7 +25,9 @@ The system breaks down complex research queries into specialized subtasks, execu
 ### Prerequisites
 
 - Python 3.8+
-- Anthropic API key (for full functionality)
+- **Choose one or both:**
+  - Anthropic API key (for cloud-based Claude models)
+  - Ollama installation (for local models)
 
 ### Automated Setup
 
@@ -86,6 +88,7 @@ python run.py
 | `/research/demo` | POST | Run demo research (no API key needed) |
 | `/research/test-citations` | POST | Test citation functionality |
 | `/models/info` | GET | Get available models and current configuration |
+| `/ollama/status` | GET | Check Ollama status and available models |
 | `/tools/available` | GET | List available tools |
 
 ## 🔧 Configuration
@@ -95,14 +98,17 @@ python run.py
 Create a `.env` file with:
 
 ```bash
-# Required for full functionality
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Provider Configuration (choose one or both)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here  # For Claude models
+OLLAMA_HOST=http://localhost:11434             # For local models
+
+# Model Configuration (supports both providers)
+LEAD_AGENT_MODEL=claude-4-sonnet-20241120      # or llama3.1:8b
+SUBAGENT_MODEL=claude-4-sonnet-20241120        # or mistral:7b  
+CITATION_MODEL=claude-3-5-haiku-20241022       # or llama3.2:3b
 
 # Optional configurations
 REDIS_URL=redis://localhost:6379
-LEAD_AGENT_MODEL=claude-3-opus-20240229
-SUBAGENT_MODEL=claude-3-sonnet-20240229
-CITATION_MODEL=claude-3-haiku-20240307
 ```
 
 ### Model Configuration
@@ -123,6 +129,86 @@ The system now supports the latest Claude models with enhanced capabilities:
 - **High Performance**: Claude 4 Opus + Claude 4 Sonnet + Claude 3.5 Haiku
 - **Balanced** (Default): Claude 4 Sonnet + Claude 4 Sonnet + Claude 3.5 Haiku  
 - **Cost Optimized**: Claude 3.5 Sonnet + Claude 3.5 Sonnet + Claude 3.5 Haiku
+
+## 🏠 Local Models with Ollama
+
+The system now supports **Ollama** for running models locally, providing:
+
+- **Zero API Costs**: No per-token charges
+- **Complete Privacy**: Data never leaves your machine
+- **Offline Operation**: No internet dependency
+- **Custom Models**: Use any Ollama-compatible model
+
+### Ollama Setup
+
+1. **Install Ollama:**
+   ```bash
+   # Visit https://ollama.ai for installation instructions
+   curl -fsSL https://ollama.ai/install.sh | sh
+   ```
+
+2. **Start Ollama:**
+   ```bash
+   ollama serve
+   ```
+
+3. **Pull recommended models:**
+   ```bash
+   # Lightweight option (2GB)
+   ollama pull llama3.2:3b
+   
+   # Balanced option (4.7GB)  
+   ollama pull llama3.1:8b
+   
+   # High performance option (40GB)
+   ollama pull llama3.1:70b
+   ```
+
+### Ollama Configuration
+
+**Available Models:**
+- **Llama 3.1/3.2**: `llama3.1:8b`, `llama3.1:70b`, `llama3.2:3b`
+- **Mistral**: `mistral:7b`, `mixtral:8x7b`
+- **Qwen**: `qwen2.5:7b`
+- **Gemma**: `gemma2:9b`
+- **Phi**: `phi3:3.8b`
+
+**Recommended Ollama Configurations:**
+
+```bash
+# High Performance (requires 40GB+ RAM)
+LEAD_AGENT_MODEL=llama3.1:70b
+SUBAGENT_MODEL=llama3.1:8b
+CITATION_MODEL=llama3.2:3b
+
+# Balanced (requires 8GB+ RAM)
+LEAD_AGENT_MODEL=llama3.1:8b
+SUBAGENT_MODEL=mistral:7b
+CITATION_MODEL=llama3.2:3b
+
+# Lightweight (requires 4GB+ RAM)
+LEAD_AGENT_MODEL=mistral:7b
+SUBAGENT_MODEL=llama3.2:3b
+CITATION_MODEL=phi3:3.8b
+
+# Mixed (Claude + Ollama for optimal cost/performance)
+LEAD_AGENT_MODEL=claude-4-sonnet-20241120
+SUBAGENT_MODEL=llama3.1:8b
+CITATION_MODEL=llama3.2:3b
+```
+
+### Testing Ollama Integration
+
+```bash
+# Test Ollama installation and integration
+python test_ollama.py
+
+# Test simple Ollama functionality
+python test_simple_ollama.py
+
+# Check Ollama status via API
+curl http://localhost:12000/ollama/status
+```
 
 ## 💡 Usage Examples
 

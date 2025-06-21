@@ -2,6 +2,135 @@
 
 All notable changes to the Multi-Agent Research System will be documented in this file.
 
+## [2.1.0] - 2025-06-21
+
+### 🏠 Ollama Integration - Local Model Support
+
+#### Major Features Added
+
+**🔄 Multi-Provider Architecture**
+- **Unified Provider System**: Seamless integration of Anthropic and Ollama providers
+- **Automatic Model Routing**: System automatically detects and routes to appropriate provider
+- **Mixed Configurations**: Use Claude for lead agent and Ollama for subagents (or any combination)
+- **Provider Abstraction**: Clean interface supporting multiple model providers
+
+**🤖 Ollama Local Models**
+- **8 Pre-configured Models**: Popular open-source models ready to use
+- **Zero API Costs**: No per-token charges for local processing
+- **Complete Privacy**: Data never leaves your machine
+- **Offline Operation**: No internet dependency for research tasks
+- **Custom Model Support**: Use any Ollama-compatible model
+
+**📊 Enhanced APIs**
+- **`/ollama/status`**: Check Ollama installation and available models
+- **Enhanced `/models/info`**: Shows both Anthropic and Ollama model configurations
+- **Provider Status**: Real-time provider availability checking
+
+#### Available Ollama Models
+- **Llama 3.1/3.2**: `llama3.1:8b`, `llama3.1:70b`, `llama3.2:3b`
+- **Mistral**: `mistral:7b`, `mixtral:8x7b`
+- **Qwen**: `qwen2.5:7b`
+- **Gemma**: `gemma2:9b`
+- **Phi**: `phi3:3.8b`
+
+#### Configuration Presets
+
+**Pure Ollama Configurations:**
+```bash
+# High Performance (40GB+ RAM)
+LEAD_AGENT_MODEL=llama3.1:70b
+SUBAGENT_MODEL=llama3.1:8b
+CITATION_MODEL=llama3.2:3b
+
+# Balanced (8GB+ RAM)
+LEAD_AGENT_MODEL=llama3.1:8b
+SUBAGENT_MODEL=mistral:7b
+CITATION_MODEL=llama3.2:3b
+
+# Lightweight (4GB+ RAM)
+LEAD_AGENT_MODEL=mistral:7b
+SUBAGENT_MODEL=llama3.2:3b
+CITATION_MODEL=phi3:3.8b
+```
+
+**Mixed Provider Configurations:**
+```bash
+# Optimal Cost/Performance
+LEAD_AGENT_MODEL=claude-4-sonnet-20241120  # Cloud reasoning
+SUBAGENT_MODEL=llama3.1:8b                 # Local processing
+CITATION_MODEL=llama3.2:3b                 # Local citations
+```
+
+#### Technical Implementation
+
+**Provider Architecture:**
+- `ModelProviderManager`: Central coordinator for all providers
+- `AnthropicProvider`: Handles Claude model interactions
+- `OllamaProvider`: Manages local Ollama model calls
+- Automatic provider detection based on model names
+- Unified error handling and response formatting
+
+**Enhanced Configuration:**
+- `OLLAMA_HOST` environment variable support
+- Automatic Ollama installation detection
+- Model availability validation
+- Provider-specific error handling
+
+#### Testing & Validation
+
+**New Test Scripts:**
+- `test_ollama.py`: Comprehensive Ollama integration testing
+- `test_simple_ollama.py`: Basic functionality verification
+- `test_ollama_research.py`: Full research workflow testing
+
+**Validation Features:**
+- Provider status checking
+- Model availability verification
+- Mixed configuration testing
+- Performance benchmarking
+
+#### Benefits
+
+**Cost Savings:**
+- Zero API costs for local models
+- Reduced cloud dependency
+- Predictable resource usage
+
+**Privacy & Security:**
+- Complete data privacy
+- No external API calls for local models
+- Offline research capabilities
+
+**Flexibility:**
+- Mix providers for optimal performance
+- Scale from lightweight to high-performance setups
+- Custom model support
+
+#### Migration Guide
+
+**Existing Users:**
+- No breaking changes - existing configurations work unchanged
+- Optional: Add Ollama for cost savings and privacy
+- Gradual migration supported (start with subagents)
+
+**New Users:**
+- Choose between cloud, local, or mixed setups
+- Start with lightweight Ollama models
+- Upgrade to high-performance configurations as needed
+
+### 🛠️ Technical Details
+
+**Dependencies Added:**
+- `ollama>=0.5.1`: Official Ollama Python client
+- Enhanced async support for local model calls
+- Improved error handling for network timeouts
+
+**Architecture Changes:**
+- Provider abstraction layer
+- Unified model calling interface
+- Enhanced configuration validation
+- Improved error reporting
+
 ## [2.0.0] - 2025-06-21
 
 ### 🚀 Major Features Added

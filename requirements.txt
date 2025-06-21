@@ -5,6 +5,7 @@ httpx
 beautifulsoup4
 litellm
 anthropic
+ollama
 python-dotenv
 redis
 asyncio

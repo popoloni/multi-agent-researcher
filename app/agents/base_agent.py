@@ -3,6 +3,7 @@ from typing import Dict, Any, List, Optional
 import asyncio
 import anthropic
 from app.core.config import settings
+from app.core.model_providers import model_manager
 import json
 
 class BaseAgent(ABC):
@@ -11,7 +12,7 @@ class BaseAgent(ABC):
     def __init__(self, model: str, name: str):
         self.model = model
         self.name = name
-        self.client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        self.provider = settings.get_provider_for_model(model)
         self.conversation_history: List[Dict[str, str]] = []
         self.total_tokens = 0
         
@@ -65,18 +66,21 @@ class BaseAgent(ABC):
         }
     
     async def _call_llm(self, prompt: str, max_tokens: int = 4000) -> str:
-        """Make a call to the LLM"""
+        """Make a call to the LLM using the appropriate provider"""
         try:
-            message = await self.client.messages.create(
+            # Prepare messages
+            messages = self.conversation_history + [{"role": "user", "content": prompt}]
+            
+            # Call the model using the provider manager
+            response, token_count = await model_manager.call_model(
                 model=self.model,
+                messages=messages,
+                system_prompt=self.get_system_prompt(),
                 max_tokens=max_tokens,
-                temperature=0.7,
-                system=self.get_system_prompt(),
-                messages=self.conversation_history + [{"role": "user", "content": prompt}]
+                temperature=0.7
             )
             
-            response = message.content[0].text
-            self.total_tokens += message.usage.total_tokens
+            self.total_tokens += token_count
             
             # Update conversation history
             self.conversation_history.append({"role": "user", "content": prompt})
@@ -85,7 +89,7 @@ class BaseAgent(ABC):
             return response
             
         except Exception as e:
-            print(f"Error calling LLM: {e}")
+            print(f"Error calling LLM ({self.provider}): {e}")
             raise
             
     def reset_conversation(self):

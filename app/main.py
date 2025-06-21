@@ -333,18 +333,75 @@ async def get_available_tools() -> Dict[str, Any]:
 
 @app.get("/models/info")
 async def get_model_info() -> Dict[str, Any]:
-    """Get information about available Claude models and current configuration"""
+    """Get information about available models from all providers and current configuration"""
+    
+    from app.core.model_providers import model_manager
+    
+    # Get provider status
+    provider_status = await model_manager.check_provider_status()
     
     return {
         "status": "success",
         "model_info": settings.get_model_info(),
+        "provider_status": provider_status,
         "notes": {
-            "claude_4_series": "Latest models with enhanced reasoning and performance",
-            "claude_3_5_series": "Improved versions of Claude 3 with better capabilities",
-            "claude_3_series": "Original Claude 3 models (legacy support)",
+            "anthropic": {
+                "claude_4_series": "Latest models with enhanced reasoning and performance",
+                "claude_3_5_series": "Improved versions of Claude 3 with better capabilities", 
+                "claude_3_series": "Original Claude 3 models (legacy support)",
+                "requires": "ANTHROPIC_API_KEY environment variable"
+            },
+            "ollama": {
+                "local_models": "Run models locally without API costs",
+                "privacy": "Complete data privacy - no external API calls",
+                "performance": "Performance depends on local hardware",
+                "requires": "Ollama installed and running locally"
+            },
+            "mixed_configs": "You can mix providers (e.g., Claude for lead, Ollama for subagents)",
             "default_config": "Uses Claude 4 Sonnet for optimal performance/cost balance"
         }
     }
+
+@app.get("/ollama/status")
+async def get_ollama_status() -> Dict[str, Any]:
+    """Check Ollama status and available models"""
+    
+    from app.core.model_providers import model_manager, ModelProvider
+    
+    try:
+        # Check if Ollama is running
+        ollama_provider = model_manager.providers[ModelProvider.OLLAMA]
+        is_running = await ollama_provider.check_connection()
+        
+        if is_running:
+            # Get available models
+            available_models = await ollama_provider.list_available_models()
+            
+            return {
+                "status": "running",
+                "host": settings.OLLAMA_HOST,
+                "available_models": available_models,
+                "recommended_models": list(settings.OLLAMA_MODELS.keys()),
+                "message": "Ollama is running and accessible"
+            }
+        else:
+            return {
+                "status": "not_running",
+                "host": settings.OLLAMA_HOST,
+                "available_models": [],
+                "recommended_models": list(settings.OLLAMA_MODELS.keys()),
+                "message": "Ollama is not running or not accessible",
+                "help": "Install Ollama from https://ollama.ai and run 'ollama serve'"
+            }
+            
+    except Exception as e:
+        return {
+            "status": "error",
+            "host": settings.OLLAMA_HOST,
+            "error": str(e),
+            "message": "Error checking Ollama status",
+            "help": "Install Ollama from https://ollama.ai and run 'ollama serve'"
+        }
 
 # Error handlers
 @app.exception_handler(Exception)
