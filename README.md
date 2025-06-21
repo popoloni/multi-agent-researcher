@@ -85,6 +85,7 @@ python run.py
 | `/research/{id}/result` | GET | Get completed research report |
 | `/research/demo` | POST | Run demo research (no API key needed) |
 | `/research/test-citations` | POST | Test citation functionality |
+| `/models/info` | GET | Get available models and current configuration |
 | `/tools/available` | GET | List available tools |
 
 ## 🔧 Configuration
@@ -106,10 +107,22 @@ CITATION_MODEL=claude-3-haiku-20240307
 
 ### Model Configuration
 
-The system uses different Claude models optimized for specific roles:
-- **Lead Agent**: Claude Opus (complex reasoning and synthesis)
-- **Subagents**: Claude Sonnet (efficient parallel processing)
-- **Citation Agent**: Claude Haiku (fast citation processing)
+The system now supports the latest Claude models with enhanced capabilities:
+
+**Available Models:**
+- **Claude 4 Series**: `claude-4-opus-20241120`, `claude-4-sonnet-20241120` (Latest)
+- **Claude 3.5 Series**: `claude-3-5-sonnet-20241022`, `claude-3-5-sonnet-20240620`, `claude-3-5-haiku-20241022`
+- **Claude 3 Series**: `claude-3-opus-20240229`, `claude-3-sonnet-20240229`, `claude-3-haiku-20240307` (Legacy)
+
+**Default Configuration (Balanced):**
+- **Lead Agent**: Claude 4 Sonnet (optimal performance/cost balance)
+- **Subagents**: Claude 4 Sonnet (enhanced parallel processing)
+- **Citation Agent**: Claude 3.5 Haiku (fast, accurate citation processing)
+
+**Recommended Configurations:**
+- **High Performance**: Claude 4 Opus + Claude 4 Sonnet + Claude 3.5 Haiku
+- **Balanced** (Default): Claude 4 Sonnet + Claude 4 Sonnet + Claude 3.5 Haiku  
+- **Cost Optimized**: Claude 3.5 Sonnet + Claude 3.5 Sonnet + Claude 3.5 Haiku
 
 ## 💡 Usage Examples
 
@@ -146,7 +159,17 @@ curl -X POST http://localhost:12000/research/demo
 curl -X POST http://localhost:12000/research/test-citations
 ```
 
-### 3. Using the Test Client
+### 3. Model Configuration
+
+```bash
+# Check available models and current configuration
+curl http://localhost:12000/models/info
+
+# Test model configuration
+python test_models.py
+```
+
+### 4. Using the Test Client
 
 ```bash
 # Run comprehensive test suite
@@ -221,6 +244,9 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "12000"]
 ### Running Tests
 
 ```bash
+# Test model configuration and connectivity
+python test_models.py
+
 # Quick system test
 python test_client.py
 
@@ -233,6 +259,7 @@ curl http://localhost:12000/
 # Test specific endpoints
 curl -X POST http://localhost:12000/research/demo
 curl -X POST http://localhost:12000/research/test-citations
+curl http://localhost:12000/models/info
 ```
 
 ### Test Coverage
@@ -253,6 +280,13 @@ Based on Anthropic's research, this multi-agent system shows:
 - **3-5x faster** research completion
 - **Higher quality** source attribution
 - **Better coverage** of complex topics
+
+**With Claude 4 Models:**
+- **Enhanced reasoning** and strategic thinking capabilities
+- **Improved synthesis** of complex information from multiple sources
+- **Better coordination** between agents in multi-agent workflows
+- **More nuanced analysis** and contextual understanding
+- **Superior performance** on complex research tasks
 
 ### Optimization Tips
 
@@ -290,6 +324,7 @@ multi-agent-researcher/
 ├── setup.sh           # Automated setup script
 ├── run.py             # Development server
 ├── test_client.py     # Test suite
+├── test_models.py     # Model configuration test
 ├── demo_with_api_key.py # Demo script
 └── README.md          # This file
 ```
@@ -383,8 +418,14 @@ For questions and support:
 # Setup and run
 ./setup.sh && python run.py
 
+# Test model configuration
+python test_models.py
+
 # Test without API key
 curl -X POST http://localhost:12000/research/demo
+
+# Check available models
+curl http://localhost:12000/models/info
 
 # View API docs
 open http://localhost:12000/docs

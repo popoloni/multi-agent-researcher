@@ -331,6 +331,21 @@ async def get_available_tools() -> Dict[str, Any]:
         ]
     }
 
+@app.get("/models/info")
+async def get_model_info() -> Dict[str, Any]:
+    """Get information about available Claude models and current configuration"""
+    
+    return {
+        "status": "success",
+        "model_info": settings.get_model_info(),
+        "notes": {
+            "claude_4_series": "Latest models with enhanced reasoning and performance",
+            "claude_3_5_series": "Improved versions of Claude 3 with better capabilities",
+            "claude_3_series": "Original Claude 3 models (legacy support)",
+            "default_config": "Uses Claude 4 Sonnet for optimal performance/cost balance"
+        }
+    }
+
 # Error handlers
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
