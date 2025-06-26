@@ -618,11 +618,194 @@ async def general_exception_handler(request, exc):
         }
     )
 
+# ========== Phase 2: Advanced Kenobi Endpoints ==========
+
+@app.post("/kenobi/repositories/index-advanced")
+async def index_repository_advanced(repo_request: RepositoryIndexRequest) -> Dict[str, Any]:
+    """
+    Advanced repository indexing with semantic search and dependency analysis
+    
+    This endpoint performs comprehensive analysis including:
+    - Code element extraction and categorization
+    - Dependency graph building
+    - Semantic embedding generation
+    - Advanced indexing for search
+    """
+    try:
+        result = await kenobi_agent.index_repository_advanced(repo_request.path)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Advanced indexing failed: {str(e)}")
+
+@app.post("/kenobi/search/semantic")
+async def search_code_semantic(search_request: CodeSearchRequest) -> Dict[str, Any]:
+    """
+    Semantic code search across indexed repositories
+    
+    Performs intelligent search using natural language understanding
+    and semantic similarity matching.
+    """
+    try:
+        context = {
+            'repository_ids': search_request.repository_ids,
+            'max_results': search_request.limit
+        }
+        
+        result = await kenobi_agent.search_code_semantic(search_request.query, context)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Semantic search failed: {str(e)}")
+
+@app.post("/kenobi/search/similar")
+async def search_similar_code(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Find code similar to a given example
+    
+    Takes example code and finds similar patterns across indexed repositories.
+    """
+    try:
+        example_code = request.get('example_code', '')
+        language = request.get('language', 'python')
+        
+        if not example_code:
+            raise HTTPException(status_code=400, detail="example_code is required")
+        
+        result = await kenobi_agent.search_similar_code(example_code, language)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Similar code search failed: {str(e)}")
+
+@app.post("/kenobi/search/patterns")
+async def find_code_patterns(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Find code that matches a described pattern
+    
+    Uses natural language description to find matching code patterns.
+    """
+    try:
+        pattern_description = request.get('pattern_description', '')
+        
+        if not pattern_description:
+            raise HTTPException(status_code=400, detail="pattern_description is required")
+        
+        result = await kenobi_agent.find_code_patterns(pattern_description)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pattern search failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repo_id}/categorize")
+async def categorize_repository_elements(repo_id: str) -> Dict[str, Any]:
+    """
+    Categorize all code elements in a repository
+    
+    Analyzes and categorizes code elements using AI-powered classification.
+    """
+    try:
+        result = await kenobi_agent.categorize_code_elements(repo_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Categorization failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repo_id}/dependencies-advanced")
+async def get_advanced_dependency_insights(repo_id: str) -> Dict[str, Any]:
+    """
+    Get comprehensive dependency analysis for a repository
+    
+    Returns detailed dependency metrics, circular dependency detection,
+    and coupling analysis.
+    """
+    try:
+        result = await kenobi_agent.get_dependency_insights(repo_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dependency analysis failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repo_id}/architecture")
+async def analyze_repository_architecture(repo_id: str) -> Dict[str, Any]:
+    """
+    Perform comprehensive architectural analysis of a repository
+    
+    Combines dependency analysis, categorization, and pattern detection
+    to provide architectural insights and recommendations.
+    """
+    try:
+        result = await kenobi_agent.analyze_repository_architecture(repo_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Architectural analysis failed: {str(e)}")
+
+@app.get("/kenobi/elements/{element_id}/relationships")
+async def analyze_element_relationships(element_id: str) -> Dict[str, Any]:
+    """
+    Discover relationships and dependencies for a code element
+    
+    Finds dependencies, dependents, and similar elements for a given code element.
+    """
+    try:
+        result = await kenobi_agent.analyze_code_relationships(element_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Relationship analysis failed: {str(e)}")
+
+@app.get("/kenobi/elements/{element_id}/categories/suggest")
+async def suggest_element_categories(element_id: str) -> Dict[str, Any]:
+    """
+    Suggest categories for a specific code element
+    
+    Uses AI-powered analysis to suggest appropriate categories with confidence scores.
+    """
+    try:
+        result = await kenobi_agent.suggest_element_categories(element_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Category suggestion failed: {str(e)}")
+
+@app.post("/kenobi/search/cross-repository")
+async def cross_repository_search(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Search across multiple repositories
+    
+    Performs semantic search across multiple indexed repositories with
+    results grouped by repository.
+    """
+    try:
+        query = request.get('query', '')
+        repository_ids = request.get('repository_ids', None)
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="query is required")
+        
+        result = await kenobi_agent.cross_repository_search(query, repository_ids)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cross-repository search failed: {str(e)}")
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup"""
     print("Multi-Agent Research System starting up...")
+    print("Phase 2 Kenobi capabilities enabled:")
+    print("  - Semantic code search")
+    print("  - Dependency analysis")
+    print("  - Code categorization")
+    print("  - Architectural insights")
 
 @app.on_event("shutdown")
 async def shutdown_event():

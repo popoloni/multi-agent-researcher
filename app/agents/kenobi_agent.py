@@ -1,5 +1,6 @@
 """
 Kenobi Agent - Specialized agent for code analysis and reverse engineering
+Enhanced with Phase 2 capabilities: semantic search, dependency analysis, and intelligent categorization
 """
 from typing import List, Dict, Any, Optional
 import asyncio
@@ -10,6 +11,11 @@ from app.models.repository_schemas import (
     Repository, RepositoryAnalysis, CodeElement, DependencyGraph
 )
 from app.services.repository_service import RepositoryService
+from app.services.indexing_service import IndexingService, SearchFilters
+from app.agents.code_search_agent import CodeSearchAgent
+from app.agents.categorization_agent import CategorizationAgent
+from app.tools.dependency_analyzer import DependencyAnalyzer
+from app.tools.embedding_tools import EmbeddingTools
 from app.core.config import settings
 
 class KenobiAgent(BaseAgent):
@@ -21,6 +27,13 @@ class KenobiAgent(BaseAgent):
             name="Kenobi Code Analysis Agent"
         )
         self.repository_service = RepositoryService()
+        
+        # Phase 2 capabilities
+        self.indexing_service = IndexingService()
+        self.code_search_agent = CodeSearchAgent()
+        self.categorization_agent = CategorizationAgent()
+        self.dependency_analyzer = DependencyAnalyzer()
+        self.embedding_tools = EmbeddingTools()
         
     def get_system_prompt(self) -> str:
         return """You are Kenobi, a specialized AI agent for code analysis and reverse engineering.
@@ -309,3 +322,248 @@ Always think step by step and provide structured, actionable insights."""
             'characteristics': f"{repo.language.value} codebase with {metrics.get('total_elements', 0)} elements",
             'complexity_level': 'Medium'
         }
+    
+    # ========== Phase 2: Advanced Capabilities ==========
+    
+    async def index_repository_advanced(self, repository_path: str) -> Dict[str, Any]:
+        """Index repository with advanced semantic search and dependency analysis"""
+        
+        # First, perform standard repository analysis
+        analysis = await self.analyze_repository(repository_path)
+        
+        # Index with advanced indexing service
+        indexing_result = await self.indexing_service.index_repository(
+            analysis.repository, 
+            analysis.files
+        )
+        
+        # Enhance with categorization
+        all_elements = []
+        for file in analysis.files:
+            all_elements.extend(file.elements)
+        
+        categorization_analysis = await self.categorization_agent.analyze_repository_categories(all_elements)
+        
+        return {
+            'repository_analysis': {
+                'repository_id': analysis.repository.id,
+                'name': analysis.repository.name,
+                'language': analysis.repository.language.value,
+                'files_count': len(analysis.files),
+                'elements_count': sum(len(f.elements) for f in analysis.files)
+            },
+            'indexing_result': indexing_result,
+            'categorization_analysis': categorization_analysis,
+            'status': 'completed'
+        }
+    
+    async def search_code_semantic(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Perform semantic code search across indexed repositories"""
+        
+        return await self.code_search_agent.search_code(query, context)
+    
+    async def search_similar_code(self, example_code: str, language: str) -> Dict[str, Any]:
+        """Find code similar to a given example"""
+        
+        return await self.code_search_agent.search_by_example(example_code, language)
+    
+    async def find_code_patterns(self, pattern_description: str) -> Dict[str, Any]:
+        """Find code that matches a described pattern"""
+        
+        return await self.code_search_agent.find_code_patterns(pattern_description)
+    
+    async def analyze_code_relationships(self, element_name: str) -> Dict[str, Any]:
+        """Discover relationships and dependencies for a code element"""
+        
+        return await self.code_search_agent.discover_code_relationships(element_name)
+    
+    async def categorize_code_elements(self, repository_id: str) -> Dict[str, Any]:
+        """Categorize all code elements in a repository"""
+        
+        # Get repository elements from indexing service
+        filters = SearchFilters()
+        filters.repositories = [repository_id]
+        filters.max_results = 1000  # Get all elements
+        
+        candidates = self.indexing_service._get_search_candidates(filters)
+        elements = [self.indexing_service._deserialize_element(candidate) for candidate in candidates]
+        
+        # Perform categorization analysis
+        categorization_results = await self.categorization_agent.categorize_elements_batch(elements)
+        repository_analysis = await self.categorization_agent.analyze_repository_categories(elements)
+        
+        return {
+            'repository_id': repository_id,
+            'element_categorizations': categorization_results,
+            'repository_analysis': repository_analysis,
+            'total_elements': len(elements)
+        }
+    
+    async def get_dependency_insights(self, repository_id: str) -> Dict[str, Any]:
+        """Get comprehensive dependency analysis for a repository"""
+        
+        return await self.indexing_service.get_dependency_insights(repository_id)
+    
+    async def suggest_element_categories(self, element_id: str) -> Dict[str, Any]:
+        """Suggest categories for a specific code element"""
+        
+        # Get element from indexing service
+        filters = SearchFilters()
+        candidates = self.indexing_service._get_search_candidates(filters)
+        
+        target_element = None
+        for candidate in candidates:
+            if candidate['id'] == element_id or candidate['full_name'] == element_id:
+                target_element = self.indexing_service._deserialize_element(candidate)
+                break
+        
+        if not target_element:
+            return {'error': f'Element {element_id} not found'}
+        
+        return await self.categorization_agent.suggest_categories(target_element)
+    
+    async def analyze_repository_architecture(self, repository_id: str) -> Dict[str, Any]:
+        """Perform comprehensive architectural analysis of a repository"""
+        
+        # Get dependency insights
+        dependency_insights = await self.get_dependency_insights(repository_id)
+        
+        # Get categorization analysis
+        categorization_analysis = await self.categorize_code_elements(repository_id)
+        
+        # Combine insights for architectural assessment
+        architectural_analysis = {
+            'repository_id': repository_id,
+            'dependency_analysis': dependency_insights,
+            'categorization_analysis': categorization_analysis['repository_analysis'],
+            'architectural_patterns': self._identify_architectural_patterns(
+                dependency_insights, 
+                categorization_analysis['repository_analysis']
+            ),
+            'recommendations': self._generate_architectural_recommendations(
+                dependency_insights,
+                categorization_analysis['repository_analysis']
+            )
+        }
+        
+        return architectural_analysis
+    
+    async def cross_repository_search(self, query: str, repository_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Search across multiple repositories"""
+        
+        filters = SearchFilters()
+        if repository_ids:
+            filters.repositories = repository_ids
+        filters.max_results = 100
+        
+        # Perform semantic search
+        search_results = await self.indexing_service.search_code(query, filters)
+        
+        # Group results by repository
+        results_by_repo = {}
+        for result in search_results:
+            repo_id = result.context.get('repository_id', 'unknown')
+            if repo_id not in results_by_repo:
+                results_by_repo[repo_id] = []
+            
+            results_by_repo[repo_id].append({
+                'element': {
+                    'name': result.element.name,
+                    'type': result.element.element_type.value,
+                    'description': result.element.description,
+                    'file_path': result.context.get('file_path', ''),
+                },
+                'similarity': result.similarity,
+                'rank_score': result.rank_score
+            })
+        
+        return {
+            'query': query,
+            'total_results': len(search_results),
+            'repositories_searched': len(results_by_repo),
+            'results_by_repository': results_by_repo
+        }
+    
+    def _identify_architectural_patterns(self, 
+                                       dependency_insights: Dict[str, Any], 
+                                       categorization_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Identify architectural patterns from dependency and categorization analysis"""
+        
+        patterns = {}
+        
+        # Extract pattern information from categorization
+        if 'architectural_insights' in categorization_analysis:
+            arch_insights = categorization_analysis['architectural_insights']
+            patterns.update(arch_insights)
+        
+        # Add dependency-based patterns
+        if 'coupling_metrics' in dependency_insights:
+            coupling = dependency_insights['coupling_metrics']
+            
+            patterns['coupling_analysis'] = {
+                'average_fan_in': coupling.get('average_fan_in', 0),
+                'average_fan_out': coupling.get('average_fan_out', 0),
+                'dependency_density': coupling.get('dependency_density', 0),
+                'assessment': self._assess_coupling_level(coupling)
+            }
+        
+        # Check for circular dependencies
+        if 'circular_dependencies' in dependency_insights:
+            circular_deps = dependency_insights['circular_dependencies']
+            patterns['circular_dependencies'] = {
+                'count': len(circular_deps),
+                'severity': 'high' if len(circular_deps) > 5 else 'medium' if len(circular_deps) > 0 else 'none'
+            }
+        
+        return patterns
+    
+    def _assess_coupling_level(self, coupling_metrics: Dict[str, Any]) -> str:
+        """Assess the coupling level based on metrics"""
+        
+        density = coupling_metrics.get('dependency_density', 0)
+        avg_fan_out = coupling_metrics.get('average_fan_out', 0)
+        
+        if density > 0.3 or avg_fan_out > 10:
+            return "High coupling - consider refactoring for better modularity"
+        elif density > 0.1 or avg_fan_out > 5:
+            return "Medium coupling - acceptable but monitor for growth"
+        else:
+            return "Low coupling - well-modularized design"
+    
+    def _generate_architectural_recommendations(self, 
+                                              dependency_insights: Dict[str, Any],
+                                              categorization_analysis: Dict[str, Any]) -> List[str]:
+        """Generate architectural improvement recommendations"""
+        
+        recommendations = []
+        
+        # Check coupling metrics
+        if 'coupling_metrics' in dependency_insights:
+            coupling = dependency_insights['coupling_metrics']
+            if coupling.get('dependency_density', 0) > 0.3:
+                recommendations.append("Consider reducing coupling by introducing interfaces and dependency injection")
+        
+        # Check circular dependencies
+        if 'circular_dependencies' in dependency_insights:
+            circular_count = len(dependency_insights['circular_dependencies'])
+            if circular_count > 0:
+                recommendations.append(f"Resolve {circular_count} circular dependencies to improve maintainability")
+        
+        # Check architectural organization
+        if 'architectural_organization' in categorization_analysis.get('architectural_insights', {}):
+            org_ratio = categorization_analysis['architectural_insights']['architectural_organization'].get('ratio', 0)
+            if org_ratio < 0.3:
+                recommendations.append("Consider adopting clearer architectural patterns (MVC, Service Layer, etc.)")
+        
+        # Check for missing patterns
+        category_dist = categorization_analysis.get('category_distribution', {})
+        if category_dist.get('testing', 0) == 0:
+            recommendations.append("Add unit tests to improve code reliability")
+        
+        if category_dist.get('error_handling', 0) < category_dist.get('api', 0):
+            recommendations.append("Improve error handling coverage, especially for API endpoints")
+        
+        if not recommendations:
+            recommendations.append("Code architecture appears well-organized - continue current practices")
+        
+        return recommendations
