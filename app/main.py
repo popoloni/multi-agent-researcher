@@ -7,7 +7,12 @@ import asyncio
 
 from app.agents.lead_agent import LeadResearchAgent
 from app.agents.citation_agent import CitationAgent
+from app.agents.kenobi_agent import KenobiAgent
 from app.models.schemas import ResearchQuery, ResearchResult, SearchResult
+from app.models.repository_schemas import (
+    RepositoryIndexRequest, CodeSearchRequest, FileAnalysisRequest,
+    MultiRepoSearchResult, RepositoryAnalysis
+)
 from app.services.research_service import ResearchService
 from app.core.config import settings
 
@@ -27,8 +32,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize research service
+# Initialize services
 research_service = ResearchService()
+kenobi_agent = KenobiAgent()
 
 @app.get("/")
 async def root():
@@ -402,6 +408,203 @@ async def get_ollama_status() -> Dict[str, Any]:
             "message": "Error checking Ollama status",
             "help": "Install Ollama from https://ollama.ai and run 'ollama serve'"
         }
+
+# Kenobi Code Analysis Endpoints
+
+@app.post("/kenobi/repositories/index")
+async def index_repository(repo_request: RepositoryIndexRequest) -> Dict[str, Any]:
+    """
+    Index a repository for code analysis
+    
+    This endpoint analyzes a local directory or clones a Git repository
+    and extracts code elements, dependencies, and metadata.
+    """
+    try:
+        # Analyze the repository
+        analysis = await kenobi_agent.analyze_repository(repo_request.path)
+        
+        return {
+            "status": "success",
+            "repository_id": analysis.repository.id,
+            "repository_name": analysis.repository.name,
+            "language": analysis.repository.language.value,
+            "framework": analysis.repository.framework,
+            "metrics": analysis.metrics,
+            "files_analyzed": len(analysis.files),
+            "elements_extracted": sum(len(f.elements) for f in analysis.files),
+            "frameworks_detected": analysis.frameworks_detected,
+            "categories_used": analysis.categories_used
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Repository indexing failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repo_id}/analysis")
+async def get_repository_analysis(repo_id: str) -> RepositoryAnalysis:
+    """
+    Get complete analysis of a repository
+    
+    Returns detailed analysis including all code elements, dependencies,
+    and AI-generated insights.
+    """
+    try:
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        analysis = await kenobi_agent.repository_service.analyze_repository(repo_id)
+        return analysis
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis retrieval failed: {str(e)}")
+
+@app.post("/kenobi/search/code")
+async def search_code(search_request: CodeSearchRequest) -> MultiRepoSearchResult:
+    """
+    Search for code elements across repositories
+    
+    Performs intelligent search across indexed repositories using
+    natural language queries and filters.
+    """
+    try:
+        # For now, return a simple search result
+        # This will be enhanced with actual search implementation
+        return MultiRepoSearchResult(
+            query=search_request.query,
+            results=[],
+            total_found=0,
+            repositories_searched=[],
+            search_time=0.0
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code search failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repo_id}/dependencies")
+async def get_dependency_graph(repo_id: str) -> Dict[str, Any]:
+    """
+    Get dependency graph for a repository
+    
+    Returns the dependency relationships between code elements
+    in the repository.
+    """
+    try:
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        dependency_graph = await kenobi_agent.analyze_dependencies(repository)
+        
+        return {
+            "repository_id": repo_id,
+            "nodes": dependency_graph.nodes,
+            "edges": [edge.dict() for edge in dependency_graph.edges],
+            "circular_dependencies": dependency_graph.circular_dependencies,
+            "node_count": len(dependency_graph.nodes),
+            "edge_count": len(dependency_graph.edges)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dependency analysis failed: {str(e)}")
+
+@app.post("/kenobi/analyze/file")
+async def analyze_single_file(file_request: FileAnalysisRequest) -> Dict[str, Any]:
+    """
+    Analyze a single file
+    
+    Analyzes a single code file and returns extracted elements,
+    dependencies, and AI-generated descriptions.
+    """
+    try:
+        # Parse the file
+        parsed_file = kenobi_agent.repository_service.code_parser.parse_file(
+            file_request.file_path, 
+            file_request.content
+        )
+        
+        # Generate descriptions for elements
+        for element in parsed_file.elements:
+            if not element.description:
+                description = await kenobi_agent.generate_code_description(element)
+                element.description = description
+        
+        return {
+            "file_path": parsed_file.file_path,
+            "language": parsed_file.language.value,
+            "elements_found": len(parsed_file.elements),
+            "imports_found": len(parsed_file.imports),
+            "line_count": parsed_file.line_count,
+            "elements": [element.dict() for element in parsed_file.elements],
+            "imports": [imp.dict() for imp in parsed_file.imports],
+            "parse_errors": parsed_file.parse_errors
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"File analysis failed: {str(e)}")
+
+@app.get("/kenobi/repositories")
+async def list_repositories() -> Dict[str, Any]:
+    """
+    List all indexed repositories
+    
+    Returns a list of all repositories that have been indexed
+    by the Kenobi agent.
+    """
+    try:
+        repositories = await kenobi_agent.repository_service.list_repositories()
+        
+        return {
+            "repositories": [
+                {
+                    "id": repo.id,
+                    "name": repo.name,
+                    "language": repo.language.value,
+                    "framework": repo.framework,
+                    "file_count": repo.file_count,
+                    "line_count": repo.line_count,
+                    "indexed_at": repo.indexed_at.isoformat(),
+                    "local_path": repo.local_path
+                }
+                for repo in repositories
+            ],
+            "total_repositories": len(repositories)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Repository listing failed: {str(e)}")
+
+@app.get("/kenobi/status")
+async def get_kenobi_status() -> Dict[str, Any]:
+    """
+    Get Kenobi agent status and configuration
+    
+    Returns information about the Kenobi agent configuration,
+    supported languages, and current statistics.
+    """
+    try:
+        repositories = await kenobi_agent.repository_service.list_repositories()
+        
+        return {
+            "status": "active",
+            "agent_name": kenobi_agent.name,
+            "model": kenobi_agent.model,
+            "provider": kenobi_agent.provider,
+            "supported_languages": [lang.value for lang in kenobi_agent.repository_service.code_parser.language_extensions.values()],
+            "repositories_indexed": len(repositories),
+            "total_tokens_used": kenobi_agent.total_tokens,
+            "configuration": {
+                "kenobi_enabled": getattr(settings, 'KENOBI_ENABLED', True),
+                "max_file_size": getattr(settings, 'CODE_ANALYSIS_MAX_FILE_SIZE', 1048576),
+                "supported_languages": getattr(settings, 'SUPPORTED_LANGUAGES', 'python,javascript,typescript,java,csharp,go')
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
 
 # Error handlers
 @app.exception_handler(Exception)
