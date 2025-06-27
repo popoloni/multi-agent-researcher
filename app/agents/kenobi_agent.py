@@ -1140,8 +1140,8 @@ Always think step by step and provide structured, actionable insights."""
                         })
 
             # Build context for the AI
-            context_text = f"Repository: {repository.get('name', 'Unknown')}\n"
-            context_text += f"Language: {repository.get('language', 'Unknown')}\n"
+            context_text = f"Repository: {repository.name}\n"
+            context_text += f"Language: {repository.language}\n"
             context_text += f"Branch: {branch}\n\n"
             
             if context_elements:
@@ -1170,7 +1170,7 @@ Keep your response conversational and helpful. Include specific file names and l
             # Use the AI engine to generate response
             analysis_request = AnalysisRequest(
                 content=prompt,
-                analysis_type=AnalysisType.EXPLANATION,
+                analysis_type=AnalysisType.CODE_EXPLANATION,
                 complexity=ModelComplexity.MEDIUM,
                 context={
                     "repository_id": repository_id,
