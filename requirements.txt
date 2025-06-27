@@ -9,3 +9,5 @@ ollama
 python-dotenv
 redis
 asyncio
+jinja2
+python-multipart

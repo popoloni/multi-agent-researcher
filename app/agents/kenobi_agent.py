@@ -1091,3 +1091,113 @@ Always think step by step and provide structured, actionable insights."""
             'max_health_score': max_health,
             'repositories_analyzed': len([r for r in batch_results if 'error' not in r.get('analysis', {})])
         }
+
+    async def chat_about_repository(self, message: str, repository_id: str, branch: str = "main") -> Dict[str, Any]:
+        """
+        Chat with Kenobi about repository code using RAG (Retrieval-Augmented Generation)
+        """
+        try:
+            # Get repository metadata
+            repository = await self.repository_service.get_repository_metadata(repository_id)
+            if not repository:
+                return {
+                    "answer": "Repository not found. Please make sure the repository is indexed.",
+                    "sources": [],
+                    "timestamp": datetime.now().isoformat()
+                }
+
+            # Search for relevant code elements based on the message
+            search_filters = SearchFilters(
+                repository_ids=[repository_id],
+                languages=None,
+                element_types=None,
+                max_results=10
+            )
+            
+            # Use semantic search to find relevant code
+            search_results = await self.search_code_semantic(message, search_filters)
+            
+            # Extract relevant context from search results
+            context_elements = []
+            sources = []
+            
+            if search_results and 'results' in search_results:
+                for result in search_results['results'][:5]:  # Limit to top 5 results
+                    element = result.get('element', {})
+                    if element:
+                        context_elements.append({
+                            'name': element.get('name', ''),
+                            'type': element.get('element_type', ''),
+                            'content': element.get('content', ''),
+                            'file_path': element.get('file_path', ''),
+                            'line_number': element.get('line_number', 0)
+                        })
+                        
+                        sources.append({
+                            'file': element.get('file_path', ''),
+                            'line': element.get('line_number', 0),
+                            'element_name': element.get('name', ''),
+                            'element_type': element.get('element_type', '')
+                        })
+
+            # Build context for the AI
+            context_text = f"Repository: {repository.get('name', 'Unknown')}\n"
+            context_text += f"Language: {repository.get('language', 'Unknown')}\n"
+            context_text += f"Branch: {branch}\n\n"
+            
+            if context_elements:
+                context_text += "Relevant code elements:\n\n"
+                for element in context_elements:
+                    context_text += f"File: {element['file_path']}\n"
+                    context_text += f"Type: {element['type']}\n"
+                    context_text += f"Name: {element['name']}\n"
+                    if element['content']:
+                        context_text += f"Content:\n{element['content'][:500]}...\n\n"
+            else:
+                context_text += "No specific code elements found for this query.\n"
+
+            # Generate response using AI
+            prompt = f"""You are Kenobi, a helpful code analysis assistant. A user is asking about their codebase.
+
+Context:
+{context_text}
+
+User Question: {message}
+
+Please provide a helpful, accurate response about the code. If you found relevant code elements, reference them in your answer. If you couldn't find specific code related to the question, provide general guidance or ask for clarification.
+
+Keep your response conversational and helpful. Include specific file names and line numbers when referencing code."""
+
+            # Use the AI engine to generate response
+            analysis_request = AnalysisRequest(
+                content=prompt,
+                analysis_type=AnalysisType.EXPLANATION,
+                complexity=ModelComplexity.MEDIUM,
+                context={
+                    "repository_id": repository_id,
+                    "branch": branch,
+                    "user_message": message
+                }
+            )
+            
+            ai_response = await self.ai_engine.analyze(analysis_request)
+            
+            response_text = ai_response.get('analysis', {}).get('explanation', 
+                "I'm sorry, I couldn't generate a response for your question. Please try rephrasing it or ask about specific code elements.")
+
+            return {
+                "answer": response_text,
+                "sources": sources,
+                "timestamp": datetime.now().isoformat(),
+                "repository_id": repository_id,
+                "branch": branch,
+                "context_elements_found": len(context_elements)
+            }
+
+        except Exception as e:
+            return {
+                "answer": f"I encountered an error while processing your question: {str(e)}. Please try again or contact support if the issue persists.",
+                "sources": [],
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e)
+            }

@@ -1,6 +1,9 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+import os
 from typing import Dict, Any, List
 from uuid import UUID
 import asyncio
@@ -33,18 +36,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files for React frontend
+frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "build")
+if os.path.exists(frontend_build_path):
+    app.mount("/static", StaticFiles(directory=os.path.join(frontend_build_path, "static")), name="static")
+
 # Initialize services
 research_service = ResearchService()
 kenobi_agent = KenobiAgent()
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def root():
+    """Serve the React frontend"""
+    frontend_index = os.path.join(frontend_build_path, "index.html")
+    if os.path.exists(frontend_index):
+        return FileResponse(frontend_index)
+    else:
+        return {
+            "status": "healthy",
+            "service": "Multi-Agent Research System",
+            "version": "1.0.0",
+            "message": "Frontend not built yet. Run 'npm run build' in the frontend directory."
+        }
+
+
+@app.get("/health")
+async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
         "service": "Multi-Agent Research System",
         "version": "1.0.0"
     }
+
+@app.get("/test-kenobi")
+async def test_kenobi():
+    """Test Kenobi agent initialization"""
+    try:
+        repos = await kenobi_agent.repository_service.list_repositories()
+        return {
+            "status": "success",
+            "kenobi_agent": str(type(kenobi_agent)),
+            "repository_service": str(type(kenobi_agent.repository_service)),
+            "repositories_count": len(repos)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": str(type(e))
+        }
 
 @app.post("/research/start")
 async def start_research(
@@ -1450,6 +1491,101 @@ async def generate_repository_insights(repository_id: str) -> Dict[str, Any]:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insight generation failed: {str(e)}")
+
+# Chat endpoints
+@app.post("/kenobi/chat")
+async def kenobi_chat(request: Dict[str, Any]) -> Dict[str, Any]:
+    """Chat with Kenobi about repository code"""
+    try:
+        message = request.get("message", "")
+        repository_id = request.get("repository_id", "")
+        branch = request.get("branch", "main")
+        
+        if not message or not repository_id:
+            raise HTTPException(status_code=400, detail="Message and repository_id are required")
+        
+        # Get repository context
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Generate response using Kenobi
+        response = await kenobi_agent.chat_about_repository(message, repository_id, branch)
+        
+        return {
+            "response": response.get("answer", "I couldn't generate a response for your question."),
+            "sources": response.get("sources", []),
+            "repository_id": repository_id,
+            "branch": branch,
+            "timestamp": response.get("timestamp")
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+@app.get("/kenobi/chat/history")
+async def get_chat_history(repository_id: str, branch: str = "main") -> Dict[str, Any]:
+    """Get chat history for a repository"""
+    try:
+        # For now, return empty history - this would be implemented with a chat history service
+        return {
+            "messages": [],
+            "repository_id": repository_id,
+            "branch": branch
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get chat history: {str(e)}")
+
+@app.delete("/kenobi/chat/history")
+async def clear_chat_history(request: Dict[str, Any]) -> Dict[str, Any]:
+    """Clear chat history for a repository"""
+    try:
+        repository_id = request.get("repository_id", "")
+        branch = request.get("branch", "main")
+        
+        if not repository_id:
+            raise HTTPException(status_code=400, detail="repository_id is required")
+        
+        # For now, just return success - this would be implemented with a chat history service
+        return {
+            "success": True,
+            "message": "Chat history cleared",
+            "repository_id": repository_id,
+            "branch": branch
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear chat history: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/branches")
+async def get_repository_branches(repository_id: str) -> Dict[str, Any]:
+    """Get available branches for a repository"""
+    try:
+        # For now, return common branch names - this would be implemented with git integration
+        return {
+            "branches": ["main", "master", "develop", "staging"],
+            "default_branch": "main",
+            "repository_id": repository_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get branches: {str(e)}")
+
+# Catch-all route for React Router (SPA) - MUST BE LAST
+@app.get("/{path:path}", response_class=HTMLResponse)
+async def serve_spa(path: str):
+    """Serve React app for all frontend routes"""
+    # Skip API routes
+    if path.startswith("api/") or path.startswith("kenobi/") or path.startswith("health") or path.startswith("test-"):
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    # Serve React frontend for all other routes
+    frontend_index = os.path.join(frontend_build_path, "index.html")
+    if os.path.exists(frontend_index):
+        return FileResponse(frontend_index)
+    else:
+        raise HTTPException(status_code=404, detail="Frontend not built")
 
 # Startup and shutdown events
 @app.on_event("startup")
