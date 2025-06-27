@@ -16,6 +16,9 @@ from app.agents.code_search_agent import CodeSearchAgent
 from app.agents.categorization_agent import CategorizationAgent
 from app.tools.dependency_analyzer import DependencyAnalyzer
 from app.tools.embedding_tools import EmbeddingTools
+from app.engines.ai_engine import AIEngine, AnalysisRequest, AnalysisType, ModelComplexity
+from app.engines.vector_service import VectorService, VectorDocument
+from app.engines.quality_engine import QualityEngine
 from app.core.config import settings
 
 class KenobiAgent(BaseAgent):
@@ -34,6 +37,11 @@ class KenobiAgent(BaseAgent):
         self.categorization_agent = CategorizationAgent()
         self.dependency_analyzer = DependencyAnalyzer()
         self.embedding_tools = EmbeddingTools()
+        
+        # Phase 3 advanced engines
+        self.ai_engine = AIEngine()
+        self.vector_service = VectorService()
+        self.quality_engine = QualityEngine()
         
     def get_system_prompt(self) -> str:
         return """You are Kenobi, a specialized AI agent for code analysis and reverse engineering.
@@ -567,3 +575,262 @@ Always think step by step and provide structured, actionable insights."""
             recommendations.append("Code architecture appears well-organized - continue current practices")
         
         return recommendations
+    
+    # ==================== PHASE 3: ADVANCED AI CAPABILITIES ====================
+    
+    async def ai_analyze_code(self, element: CodeElement, analysis_type: AnalysisType, 
+                             complexity: ModelComplexity = ModelComplexity.MEDIUM,
+                             streaming: bool = False) -> Dict[str, Any]:
+        """Perform AI-powered code analysis"""
+        
+        # Get repository context
+        repository = await self.repository_service.get_repository_metadata(element.repository_id)
+        
+        context = {
+            'repository_name': repository.name if repository else 'unknown',
+            'language': repository.language.value if repository and repository.language else 'unknown',
+            'framework': repository.framework or 'unknown',
+            'dependencies': element.dependencies
+        }
+        
+        # Create analysis request
+        request = AnalysisRequest(
+            analysis_type=analysis_type,
+            code_element=element,
+            context=context,
+            complexity=complexity,
+            streaming=streaming
+        )
+        
+        # Perform analysis
+        result = await self.ai_engine.analyze_code(request)
+        
+        return {
+            'element_id': element.id,
+            'analysis_type': analysis_type.value,
+            'result': result.result,
+            'confidence': result.confidence,
+            'processing_time': result.processing_time,
+            'model_used': result.model_used,
+            'timestamp': result.timestamp.isoformat()
+        }
+    
+    async def ai_explain_code(self, element: CodeElement) -> Dict[str, Any]:
+        """Generate AI explanation of code"""
+        return await self.ai_analyze_code(element, AnalysisType.CODE_EXPLANATION)
+    
+    async def ai_suggest_improvements(self, element: CodeElement) -> Dict[str, Any]:
+        """Generate AI improvement suggestions"""
+        return await self.ai_analyze_code(element, AnalysisType.IMPROVEMENT_SUGGESTIONS, ModelComplexity.COMPLEX)
+    
+    async def ai_generate_tests(self, element: CodeElement) -> Dict[str, Any]:
+        """Generate AI test cases"""
+        return await self.ai_analyze_code(element, AnalysisType.TEST_GENERATION, ModelComplexity.COMPLEX)
+    
+    async def ai_security_analysis(self, element: CodeElement) -> Dict[str, Any]:
+        """Perform AI security analysis"""
+        return await self.ai_analyze_code(element, AnalysisType.SECURITY_ANALYSIS, ModelComplexity.COMPLEX)
+    
+    async def ai_performance_analysis(self, element: CodeElement) -> Dict[str, Any]:
+        """Perform AI performance analysis"""
+        return await self.ai_analyze_code(element, AnalysisType.PERFORMANCE_ANALYSIS, ModelComplexity.MEDIUM)
+    
+    async def vector_add_repository(self, repository: Repository) -> Dict[str, Any]:
+        """Add repository to vector database"""
+        
+        # Get all elements for the repository
+        filters = SearchFilters()
+        filters.repositories = [repository.id]
+        candidates = self.indexing_service._get_search_candidates(filters)
+        
+        added_count = 0
+        failed_count = 0
+        
+        for candidate in candidates:
+            try:
+                element = self.indexing_service._deserialize_element(candidate)
+                success = await self.vector_service.add_code_element(element, repository)
+                if success:
+                    added_count += 1
+                else:
+                    failed_count += 1
+            except Exception as e:
+                print(f"Failed to add element to vector DB: {e}")
+                failed_count += 1
+        
+        return {
+            'repository_id': repository.id,
+            'elements_added': added_count,
+            'elements_failed': failed_count,
+            'total_processed': added_count + failed_count
+        }
+    
+    async def vector_similarity_search(self, query: str, limit: int = 10, 
+                                     filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Perform vector similarity search"""
+        
+        results = await self.vector_service.similarity_search(query, limit, filters)
+        
+        # Convert to serializable format
+        search_results = []
+        for result in results:
+            search_results.append({
+                'document': {
+                    'id': result.document.id,
+                    'content': result.document.content[:500] + '...' if len(result.document.content) > 500 else result.document.content,
+                    'metadata': result.document.metadata
+                },
+                'similarity_score': result.similarity_score,
+                'distance': result.distance,
+                'rank': result.rank
+            })
+        
+        return {
+            'query': query,
+            'results': search_results,
+            'total_results': len(search_results)
+        }
+    
+    async def vector_cluster_analysis(self, num_clusters: int = 5, 
+                                    filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Perform vector clustering analysis"""
+        
+        clusters = await self.vector_service.cluster_documents(num_clusters, filters)
+        
+        # Convert to serializable format
+        cluster_results = []
+        for cluster in clusters:
+            cluster_results.append({
+                'cluster_id': cluster.cluster_id,
+                'cluster_size': cluster.cluster_size,
+                'intra_cluster_distance': cluster.intra_cluster_distance,
+                'documents': [
+                    {
+                        'id': doc.id,
+                        'metadata': doc.metadata
+                    }
+                    for doc in cluster.documents[:10]  # Limit to first 10 for response size
+                ]
+            })
+        
+        return {
+            'num_clusters': num_clusters,
+            'clusters': cluster_results,
+            'total_documents_clustered': sum(c.cluster_size for c in clusters)
+        }
+    
+    async def quality_analyze_element(self, element: CodeElement) -> Dict[str, Any]:
+        """Perform comprehensive quality analysis on code element"""
+        
+        # Get repository context
+        repository = await self.repository_service.get_repository_metadata(element.repository_id)
+        
+        # Perform quality analysis
+        report = await self.quality_engine.analyze_quality(element, repository)
+        
+        # Convert to serializable format
+        return {
+            'element_id': report.element_id,
+            'repository_id': report.repository_id,
+            'overall_score': report.overall_score,
+            'quality_grade': self.quality_engine._get_quality_grade(report.overall_score),
+            'scores': {
+                metric.value: {
+                    'score': score.score,
+                    'max_score': score.max_score,
+                    'issues_count': score.issues_count,
+                    'trend': score.trend
+                }
+                for metric, score in report.scores.items()
+            },
+            'issues': [
+                {
+                    'metric': issue.metric.value,
+                    'severity': issue.severity.value,
+                    'title': issue.title,
+                    'description': issue.description,
+                    'location': issue.location,
+                    'line_number': issue.line_number,
+                    'suggestion': issue.suggestion,
+                    'effort_estimate': issue.effort_estimate,
+                    'impact_score': issue.impact_score
+                }
+                for issue in report.issues
+            ],
+            'recommendations': report.recommendations,
+            'analysis_timestamp': report.analysis_timestamp.isoformat(),
+            'processing_time': report.processing_time
+        }
+    
+    async def quality_repository_summary(self, repository_id: str) -> Dict[str, Any]:
+        """Get quality summary for entire repository"""
+        
+        return self.quality_engine.get_repository_quality_summary(repository_id)
+    
+    async def quality_trends_analysis(self, element_id: str, days: int = 30) -> Dict[str, Any]:
+        """Get quality trends for an element"""
+        
+        trends = self.quality_engine.get_quality_trends(element_id, days)
+        
+        # Convert to serializable format
+        trend_results = {}
+        for metric, trend in trends.items():
+            trend_results[metric.value] = {
+                'trend_direction': trend.trend_direction,
+                'trend_strength': trend.trend_strength,
+                'prediction': trend.prediction,
+                'data_points': len(trend.scores),
+                'latest_score': trend.scores[-1] if trend.scores else None
+            }
+        
+        return {
+            'element_id': element_id,
+            'analysis_period_days': days,
+            'trends': trend_results
+        }
+    
+    async def get_ai_statistics(self) -> Dict[str, Any]:
+        """Get AI engine usage statistics"""
+        
+        return self.ai_engine.get_analysis_statistics()
+    
+    async def get_vector_statistics(self) -> Dict[str, Any]:
+        """Get vector database statistics"""
+        
+        return self.vector_service.get_collection_stats()
+    
+    async def batch_quality_analysis(self, repository_id: str) -> Dict[str, Any]:
+        """Perform batch quality analysis on all elements in repository"""
+        
+        # Get all elements for the repository
+        filters = SearchFilters()
+        filters.repositories = [repository_id]
+        candidates = self.indexing_service._get_search_candidates(filters)
+        
+        # Get repository
+        repository = await self.repository_service.get_repository_metadata(repository_id)
+        
+        analyzed_count = 0
+        failed_count = 0
+        total_score = 0
+        
+        for candidate in candidates[:50]:  # Limit to 50 elements for performance
+            try:
+                element = self.indexing_service._deserialize_element(candidate)
+                report = await self.quality_engine.analyze_quality(element, repository)
+                analyzed_count += 1
+                total_score += report.overall_score
+            except Exception as e:
+                print(f"Failed to analyze element quality: {e}")
+                failed_count += 1
+        
+        avg_score = total_score / max(analyzed_count, 1)
+        
+        return {
+            'repository_id': repository_id,
+            'elements_analyzed': analyzed_count,
+            'elements_failed': failed_count,
+            'average_quality_score': avg_score,
+            'quality_grade': self.quality_engine._get_quality_grade(avg_score),
+            'repository_summary': await self.quality_repository_summary(repository_id)
+        }

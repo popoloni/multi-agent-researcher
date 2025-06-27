@@ -13,6 +13,7 @@ from app.models.repository_schemas import (
     RepositoryIndexRequest, CodeSearchRequest, FileAnalysisRequest,
     MultiRepoSearchResult, RepositoryAnalysis
 )
+from app.services.indexing_service import SearchFilters
 from app.services.research_service import ResearchService
 from app.core.config import settings
 
@@ -796,16 +797,363 @@ async def cross_repository_search(request: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cross-repository search failed: {str(e)}")
 
+# ==================== PHASE 3: ADVANCED AI & ANALYTICS ENDPOINTS ====================
+
+@app.post("/kenobi/ai/analyze-code")
+async def ai_analyze_code(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    AI-powered code analysis with specialized prompting
+    
+    Performs advanced AI analysis including code explanation, improvement suggestions,
+    test generation, security analysis, and performance optimization.
+    """
+    try:
+        element_id = request.get('element_id')
+        analysis_type = request.get('analysis_type', 'code_explanation')
+        complexity = request.get('complexity', 'medium')
+        streaming = request.get('streaming', False)
+        
+        if not element_id:
+            raise HTTPException(status_code=400, detail="element_id is required")
+        
+        # Get element from indexing service
+        filters = SearchFilters()
+        candidates = kenobi_agent.indexing_service._get_search_candidates(filters)
+        
+        target_element = None
+        for candidate in candidates:
+            if candidate['id'] == element_id or candidate['full_name'] == element_id:
+                target_element = kenobi_agent.indexing_service._deserialize_element(candidate)
+                break
+        
+        if not target_element:
+            raise HTTPException(status_code=404, detail=f"Element {element_id} not found")
+        
+        # Convert string enums
+        from app.engines.ai_engine import AnalysisType, ModelComplexity
+        analysis_type_enum = AnalysisType(analysis_type)
+        complexity_enum = ModelComplexity(complexity)
+        
+        result = await kenobi_agent.ai_analyze_code(
+            target_element, 
+            analysis_type_enum, 
+            complexity_enum, 
+            streaming
+        )
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid parameter: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+
+@app.post("/kenobi/ai/explain-code")
+async def ai_explain_code(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate AI explanation of code
+    
+    Provides comprehensive natural language explanation of what the code does,
+    how it works, and its key components.
+    """
+    try:
+        element_id = request.get('element_id')
+        
+        if not element_id:
+            raise HTTPException(status_code=400, detail="element_id is required")
+        
+        # Get element
+        filters = SearchFilters()
+        candidates = kenobi_agent.indexing_service._get_search_candidates(filters)
+        
+        target_element = None
+        for candidate in candidates:
+            if candidate['id'] == element_id or candidate['full_name'] == element_id:
+                target_element = kenobi_agent.indexing_service._deserialize_element(candidate)
+                break
+        
+        if not target_element:
+            raise HTTPException(status_code=404, detail=f"Element {element_id} not found")
+        
+        result = await kenobi_agent.ai_explain_code(target_element)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code explanation failed: {str(e)}")
+
+@app.post("/kenobi/ai/suggest-improvements")
+async def ai_suggest_improvements(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate AI improvement suggestions
+    
+    Analyzes code for potential improvements in performance, readability,
+    maintainability, security, and best practices.
+    """
+    try:
+        element_id = request.get('element_id')
+        
+        if not element_id:
+            raise HTTPException(status_code=400, detail="element_id is required")
+        
+        # Get element
+        filters = SearchFilters()
+        candidates = kenobi_agent.indexing_service._get_search_candidates(filters)
+        
+        target_element = None
+        for candidate in candidates:
+            if candidate['id'] == element_id or candidate['full_name'] == element_id:
+                target_element = kenobi_agent.indexing_service._deserialize_element(candidate)
+                break
+        
+        if not target_element:
+            raise HTTPException(status_code=404, detail=f"Element {element_id} not found")
+        
+        result = await kenobi_agent.ai_suggest_improvements(target_element)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Improvement suggestions failed: {str(e)}")
+
+@app.post("/kenobi/ai/generate-tests")
+async def ai_generate_tests(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate AI test cases
+    
+    Creates comprehensive unit tests including happy path, edge cases,
+    error conditions, and integration scenarios.
+    """
+    try:
+        element_id = request.get('element_id')
+        
+        if not element_id:
+            raise HTTPException(status_code=400, detail="element_id is required")
+        
+        # Get element
+        filters = SearchFilters()
+        candidates = kenobi_agent.indexing_service._get_search_candidates(filters)
+        
+        target_element = None
+        for candidate in candidates:
+            if candidate['id'] == element_id or candidate['full_name'] == element_id:
+                target_element = kenobi_agent.indexing_service._deserialize_element(candidate)
+                break
+        
+        if not target_element:
+            raise HTTPException(status_code=404, detail=f"Element {element_id} not found")
+        
+        result = await kenobi_agent.ai_generate_tests(target_element)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Test generation failed: {str(e)}")
+
+@app.post("/kenobi/vectors/embed-repository")
+async def vector_embed_repository(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Add repository to vector database
+    
+    Embeds all code elements from a repository into the vector database
+    for advanced semantic search and clustering.
+    """
+    try:
+        repository_id = request.get('repository_id')
+        
+        if not repository_id:
+            raise HTTPException(status_code=400, detail="repository_id is required")
+        
+        # Get repository
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail=f"Repository {repository_id} not found")
+        
+        result = await kenobi_agent.vector_add_repository(repository)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Vector embedding failed: {str(e)}")
+
+@app.post("/kenobi/vectors/similarity-search")
+async def vector_similarity_search(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Perform vector similarity search
+    
+    Uses neural embeddings to find semantically similar code elements
+    with advanced filtering and ranking.
+    """
+    try:
+        query = request.get('query')
+        limit = request.get('limit', 10)
+        filters = request.get('filters', None)
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="query is required")
+        
+        result = await kenobi_agent.vector_similarity_search(query, limit, filters)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Vector similarity search failed: {str(e)}")
+
+@app.post("/kenobi/vectors/cluster-analysis")
+async def vector_cluster_analysis(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Perform vector clustering analysis
+    
+    Groups similar code elements into clusters for pattern discovery
+    and architectural analysis.
+    """
+    try:
+        num_clusters = request.get('num_clusters', 5)
+        filters = request.get('filters', None)
+        
+        result = await kenobi_agent.vector_cluster_analysis(num_clusters, filters)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Vector clustering failed: {str(e)}")
+
+@app.post("/kenobi/quality/analyze-element")
+async def quality_analyze_element(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Perform comprehensive quality analysis
+    
+    Analyzes code quality including complexity, maintainability, security,
+    performance, readability, and documentation coverage.
+    """
+    try:
+        element_id = request.get('element_id')
+        
+        if not element_id:
+            raise HTTPException(status_code=400, detail="element_id is required")
+        
+        # Get element
+        filters = SearchFilters()
+        candidates = kenobi_agent.indexing_service._get_search_candidates(filters)
+        
+        target_element = None
+        for candidate in candidates:
+            if candidate['id'] == element_id or candidate['full_name'] == element_id:
+                target_element = kenobi_agent.indexing_service._deserialize_element(candidate)
+                break
+        
+        if not target_element:
+            raise HTTPException(status_code=404, detail=f"Element {element_id} not found")
+        
+        result = await kenobi_agent.quality_analyze_element(target_element)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Quality analysis failed: {str(e)}")
+
+@app.get("/kenobi/quality/repository/{repository_id}")
+async def quality_repository_summary(repository_id: str) -> Dict[str, Any]:
+    """
+    Get quality summary for repository
+    
+    Provides comprehensive quality metrics and trends for an entire repository
+    including overall scores, issue distribution, and quality grades.
+    """
+    try:
+        result = await kenobi_agent.quality_repository_summary(repository_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Repository quality summary failed: {str(e)}")
+
+@app.get("/kenobi/quality/trends/{element_id}")
+async def quality_trends_analysis(element_id: str, days: int = 30) -> Dict[str, Any]:
+    """
+    Get quality trends for element
+    
+    Analyzes quality trends over time including trend direction,
+    strength, and predictions for future quality scores.
+    """
+    try:
+        result = await kenobi_agent.quality_trends_analysis(element_id, days)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Quality trends analysis failed: {str(e)}")
+
+@app.post("/kenobi/quality/batch-analyze")
+async def batch_quality_analysis(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Perform batch quality analysis
+    
+    Analyzes quality for all elements in a repository and provides
+    comprehensive quality assessment and recommendations.
+    """
+    try:
+        repository_id = request.get('repository_id')
+        
+        if not repository_id:
+            raise HTTPException(status_code=400, detail="repository_id is required")
+        
+        result = await kenobi_agent.batch_quality_analysis(repository_id)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch quality analysis failed: {str(e)}")
+
+@app.get("/kenobi/statistics/ai")
+async def get_ai_statistics() -> Dict[str, Any]:
+    """
+    Get AI engine usage statistics
+    
+    Provides insights into AI analysis usage, model performance,
+    and analysis type distribution.
+    """
+    try:
+        result = await kenobi_agent.get_ai_statistics()
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI statistics failed: {str(e)}")
+
+@app.get("/kenobi/statistics/vectors")
+async def get_vector_statistics() -> Dict[str, Any]:
+    """
+    Get vector database statistics
+    
+    Provides insights into vector database usage, embedding distribution,
+    and collection statistics.
+    """
+    try:
+        result = await kenobi_agent.get_vector_statistics()
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Vector statistics failed: {str(e)}")
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup"""
     print("Multi-Agent Research System starting up...")
-    print("Phase 2 Kenobi capabilities enabled:")
-    print("  - Semantic code search")
-    print("  - Dependency analysis")
-    print("  - Code categorization")
-    print("  - Architectural insights")
+    print("Phase 3 Kenobi capabilities enabled:")
+    print("  - Advanced AI analysis with specialized prompting")
+    print("  - Vector database with neural embeddings")
+    print("  - Comprehensive code quality analysis")
+    print("  - Real-time analytics and trend analysis")
+    print("  - Semantic clustering and pattern discovery")
+    print("  - Production-ready performance optimization")
 
 @app.on_event("shutdown")
 async def shutdown_event():
