@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Research System</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">R</div>
+                    <span class="logo-text">REPLY</span>
+                </div>
+                <div class="header-actions">
+                    <div class="header-item">
+                        <i class="fas fa-bell"></i>
+                        <span>Task pending</span>
+                    </div>
+                    <div class="header-item">
+                        <i class="fas fa-star"></i>
+                        <span>Favorites</span>
+                    </div>
+                    <div class="header-item">
+                        <i class="fas fa-user"></i>
+                        <span>Alessandra Sartori</span>
+                    </div>
+                    <div class="header-item">
+                        <span>% EN</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Breadcrumb -->
+            <nav class="breadcrumb">
+                <span class="breadcrumb-item">Your projects</span>
+                <i class="fas fa-chevron-right"></i>
+                <span class="breadcrumb-item active">Repository</span>
+            </nav>
+
+            <!-- Repository Management Section -->
+            <div class="page-header">
+                <h1>Repository</h1>
+                <button class="btn btn-primary" onclick="showAddRepositoryModal()">
+                    <i class="fas fa-plus"></i>
+                    Add remote repository
+                </button>
+            </div>
+
+            <!-- Search and Filter Section -->
+            <div class="search-section">
+                <div class="search-grid">
+                    <div class="search-field">
+                        <label>Repository name</label>
+                        <input type="text" id="repository-search" placeholder="Enter repository name">
+                    </div>
+                    <div class="search-field">
+                        <label>Keyword</label>
+                        <div class="keyword-input">
+                            <input type="text" id="keyword-search" placeholder="Enter keyword">
+                            <button class="btn-icon" onclick="clearKeyword()">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Repository Table -->
+            <div class="repository-table">
+                <div class="table-header">
+                    <div class="table-row">
+                        <div class="table-cell header-cell">Name</div>
+                        <div class="table-cell header-cell">URL</div>
+                        <div class="table-cell header-cell">Actions</div>
+                    </div>
+                </div>
+                <div class="table-body" id="repository-list">
+                    <!-- Repository rows will be populated here -->
+                    <div class="empty-state">
+                        <i class="fas fa-folder-open"></i>
+                        <p>No repositories found. Add your first repository to get started.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <div class="pagination-info">
+                    <span id="pagination-text">0 - 0 of 0</span>
+                </div>
+                <div class="pagination-controls">
+                    <button class="page-btn active">1</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Add Repository Modal -->
+        <div id="add-repository-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add Remote Repository</h2>
+                    <button class="btn-close" onclick="hideAddRepositoryModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="add-repository-form" class="modal-body">
+                    <div class="form-group">
+                        <label for="repo-url">Repository URL *</label>
+                        <input type="url" id="repo-url" placeholder="https://github.com/owner/repository" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="repo-name">Repository Name</label>
+                        <input type="text" id="repo-name" placeholder="Auto-detected from URL">
+                    </div>
+                    <div class="form-group">
+                        <label for="repo-branch">Branch</label>
+                        <input type="text" id="repo-branch" value="main" placeholder="main">
+                    </div>
+                    <div class="form-group">
+                        <label for="repo-description">Description</label>
+                        <textarea id="repo-description" placeholder="Optional description"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="hideAddRepositoryModal()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            Add Repository
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Repository Details Modal -->
+        <div id="repository-details-modal" class="modal hidden">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2 id="repo-details-title">Repository Details</h2>
+                    <button class="btn-close" onclick="hideRepositoryDetailsModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="repository-details-content">
+                        <!-- Repository details will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Processing...</p>
+            </div>
+        </div>
+
+        <!-- Notification Container -->
+        <div id="notifications" class="notifications-container"></div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
