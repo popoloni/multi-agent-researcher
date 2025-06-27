@@ -30,6 +30,13 @@ class ElementType(str, Enum):
     SERVICE = "service"
     CONTROLLER = "controller"
 
+class CloneStatus(str, Enum):
+    """Repository clone status"""
+    PENDING = "pending"
+    CLONING = "cloning"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
 class Repository(BaseModel):
     """Repository metadata and information"""
     id: str = Field(..., description="Unique repository identifier")
@@ -43,6 +50,14 @@ class Repository(BaseModel):
     file_count: int = Field(0, description="Number of files in repository")
     line_count: int = Field(0, description="Total lines of code")
     size_bytes: int = Field(0, description="Repository size in bytes")
+    
+    # GitHub-specific fields
+    github_owner: Optional[str] = Field(None, description="GitHub repository owner")
+    github_repo: Optional[str] = Field(None, description="GitHub repository name")
+    clone_status: CloneStatus = Field(CloneStatus.COMPLETED, description="Repository clone status")
+    clone_progress: float = Field(0.0, description="Clone progress percentage (0-100)")
+    github_metadata: Optional[Dict[str, Any]] = Field(None, description="GitHub repository metadata")
+    branch: Optional[str] = Field(None, description="Repository branch being used")
     
 class ImportInfo(BaseModel):
     """Information about imports/dependencies"""
@@ -146,3 +161,69 @@ class FileAnalysisRequest(BaseModel):
     content: Optional[str] = Field(None, description="File content (if not reading from path)")
     language: Optional[LanguageType] = Field(None, description="Language override")
     include_dependencies: bool = Field(True, description="Whether to analyze dependencies")
+
+# GitHub-specific schemas
+class GitHubSearchRequest(BaseModel):
+    """Request to search GitHub repositories"""
+    query: str = Field(..., description="Search query")
+    language: Optional[str] = Field(None, description="Programming language filter")
+    sort: str = Field("stars", description="Sort by: stars, forks, help-wanted-issues, updated")
+    order: str = Field("desc", description="Sort order: asc or desc")
+    per_page: int = Field(30, description="Results per page (max 100)")
+    page: int = Field(1, description="Page number")
+
+class GitHubCloneRequest(BaseModel):
+    """Request to clone a GitHub repository"""
+    owner: str = Field(..., description="Repository owner")
+    repo: str = Field(..., description="Repository name")
+    branch: str = Field("main", description="Branch to clone")
+    local_name: Optional[str] = Field(None, description="Local directory name (defaults to repo name)")
+
+class GitHubRepositoryInfo(BaseModel):
+    """GitHub repository information"""
+    id: int = Field(..., description="GitHub repository ID")
+    name: str = Field(..., description="Repository name")
+    full_name: str = Field(..., description="Full repository name (owner/repo)")
+    owner: str = Field(..., description="Repository owner")
+    description: Optional[str] = Field(None, description="Repository description")
+    language: Optional[str] = Field(None, description="Primary language")
+    stars: int = Field(0, description="Star count")
+    forks: int = Field(0, description="Fork count")
+    issues: int = Field(0, description="Open issues count")
+    size: int = Field(0, description="Repository size in KB")
+    default_branch: str = Field("main", description="Default branch")
+    clone_url: str = Field(..., description="Clone URL")
+    html_url: str = Field(..., description="GitHub web URL")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    pushed_at: Optional[str] = Field(None, description="Last push timestamp")
+    topics: List[str] = Field(default_factory=list, description="Repository topics")
+    license: Optional[str] = Field(None, description="License name")
+    archived: bool = Field(False, description="Is archived")
+    disabled: bool = Field(False, description="Is disabled")
+    private: bool = Field(False, description="Is private")
+    fork: bool = Field(False, description="Is fork")
+
+class GitHubBranch(BaseModel):
+    """GitHub branch information"""
+    name: str = Field(..., description="Branch name")
+    sha: str = Field(..., description="Commit SHA")
+    protected: bool = Field(False, description="Is protected branch")
+    commit_url: str = Field(..., description="Commit URL")
+
+class GitHubSearchResponse(BaseModel):
+    """GitHub search response"""
+    repositories: List[GitHubRepositoryInfo] = Field(default_factory=list, description="Found repositories")
+    total_count: int = Field(0, description="Total number of results")
+    incomplete_results: bool = Field(False, description="Are results incomplete")
+    page: int = Field(1, description="Current page")
+    per_page: int = Field(30, description="Results per page")
+    has_next: bool = Field(False, description="Has next page")
+
+class CloneProgressUpdate(BaseModel):
+    """Clone progress update"""
+    repository_id: str = Field(..., description="Repository ID")
+    status: CloneStatus = Field(..., description="Current status")
+    progress: float = Field(0.0, description="Progress percentage (0-100)")
+    message: str = Field("", description="Status message")
+    error: Optional[str] = Field(None, description="Error message if failed")

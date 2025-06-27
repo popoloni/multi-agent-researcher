@@ -14,10 +14,13 @@ from app.agents.kenobi_agent import KenobiAgent
 from app.models.schemas import ResearchQuery, ResearchResult, SearchResult
 from app.models.repository_schemas import (
     RepositoryIndexRequest, CodeSearchRequest, FileAnalysisRequest,
-    MultiRepoSearchResult, RepositoryAnalysis
+    MultiRepoSearchResult, RepositoryAnalysis, GitHubSearchRequest, 
+    GitHubCloneRequest, GitHubSearchResponse, GitHubRepositoryInfo,
+    GitHubBranch, CloneProgressUpdate
 )
 from app.services.indexing_service import SearchFilters
 from app.services.research_service import ResearchService
+from app.services.github_service import github_service
 from app.core.config import settings
 
 # Initialize FastAPI app
@@ -659,6 +662,217 @@ async def general_exception_handler(request, exc):
             "message": str(exc)
         }
     )
+
+# ========== GitHub API Integration Endpoints ==========
+
+@app.get("/github/search")
+async def search_github_repositories(
+    query: str,
+    language: str = None,
+    sort: str = "stars",
+    order: str = "desc",
+    per_page: int = 30,
+    page: int = 1
+) -> GitHubSearchResponse:
+    """
+    Search GitHub repositories
+    
+    Search for repositories on GitHub with optional filters for language,
+    sorting, and pagination.
+    """
+    try:
+        result = await github_service.search_repositories(
+            query=query,
+            language=language,
+            sort=sort,
+            order=order,
+            per_page=per_page,
+            page=page
+        )
+        
+        return GitHubSearchResponse(**result)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"GitHub search failed: {str(e)}")
+
+@app.get("/github/repositories/{owner}/{repo}")
+async def get_github_repository_info(owner: str, repo: str) -> GitHubRepositoryInfo:
+    """
+    Get detailed information about a specific GitHub repository
+    
+    Retrieves comprehensive metadata about a repository including
+    stars, forks, language, description, and other details.
+    """
+    try:
+        repo_info = await github_service.get_repository_info(owner, repo)
+        return GitHubRepositoryInfo(**repo_info)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get repository info: {str(e)}")
+
+@app.get("/github/repositories/{owner}/{repo}/branches")
+async def list_github_repository_branches(owner: str, repo: str) -> List[GitHubBranch]:
+    """
+    List all branches for a GitHub repository
+    
+    Returns a list of all branches available in the specified repository.
+    """
+    try:
+        branches = await github_service.list_branches(owner, repo)
+        return [GitHubBranch(**branch) for branch in branches]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list branches: {str(e)}")
+
+@app.post("/github/repositories/clone")
+async def clone_github_repository(clone_request: GitHubCloneRequest) -> Dict[str, Any]:
+    """
+    Clone a GitHub repository for analysis
+    
+    Clones the specified GitHub repository to local storage and
+    prepares it for code analysis. Returns repository metadata
+    and clone status.
+    """
+    try:
+        # Clone repository using enhanced service
+        repository = await kenobi_agent.repository_service.clone_github_repository(
+            owner=clone_request.owner,
+            repo=clone_request.repo,
+            branch=clone_request.branch,
+            local_name=clone_request.local_name
+        )
+        
+        return {
+            "status": "success",
+            "repository_id": repository.id,
+            "repository": {
+                "id": repository.id,
+                "name": repository.name,
+                "owner": repository.github_owner,
+                "repo": repository.github_repo,
+                "branch": repository.branch,
+                "local_path": repository.local_path,
+                "language": repository.language,
+                "framework": repository.framework,
+                "description": repository.description,
+                "file_count": repository.file_count,
+                "line_count": repository.line_count,
+                "size_bytes": repository.size_bytes,
+                "clone_status": repository.clone_status,
+                "clone_progress": repository.clone_progress,
+                "github_metadata": repository.github_metadata
+            },
+            "message": f"Repository {clone_request.owner}/{clone_request.repo} cloned successfully"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clone failed: {str(e)}")
+
+@app.get("/github/repositories/{owner}/{repo}/contents")
+async def get_github_repository_contents(
+    owner: str, 
+    repo: str, 
+    path: str = "", 
+    branch: str = "main"
+) -> List[Dict[str, Any]]:
+    """
+    Get contents of a GitHub repository at a specific path
+    
+    Browse the file structure of a repository without cloning it.
+    Useful for previewing repository contents before cloning.
+    """
+    try:
+        contents = await github_service.get_repository_contents(owner, repo, path, branch)
+        return contents
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get repository contents: {str(e)}")
+
+@app.get("/github/user/repositories")
+async def get_user_repositories(
+    username: str = None,
+    type_filter: str = "all",
+    sort: str = "updated",
+    per_page: int = 30,
+    page: int = 1
+) -> List[GitHubRepositoryInfo]:
+    """
+    Get repositories for a user (or authenticated user)
+    
+    Returns a list of repositories for the specified user, or for the
+    authenticated user if no username is provided.
+    """
+    try:
+        repositories = await github_service.get_user_repositories(
+            username=username,
+            type_filter=type_filter,
+            sort=sort,
+            per_page=per_page,
+            page=page
+        )
+        
+        return [GitHubRepositoryInfo(**repo) for repo in repositories]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get user repositories: {str(e)}")
+
+@app.get("/github/rate-limit")
+async def get_github_rate_limit() -> Dict[str, Any]:
+    """
+    Get current GitHub API rate limit status
+    
+    Returns information about remaining API calls and reset time.
+    """
+    try:
+        rate_limit = await github_service.get_rate_limit_status()
+        return rate_limit
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get rate limit: {str(e)}")
+
+@app.get("/github/clone-status/{repo_id}")
+async def get_clone_status(repo_id: str) -> CloneProgressUpdate:
+    """
+    Get clone status for a repository
+    
+    Returns the current clone progress and status for the specified repository.
+    """
+    try:
+        status = await kenobi_agent.repository_service.get_clone_status(repo_id)
+        if not status:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        return status
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get clone status: {str(e)}")
+
+@app.post("/github/clone-cancel/{repo_id}")
+async def cancel_clone(repo_id: str) -> Dict[str, Any]:
+    """
+    Cancel an ongoing clone operation
+    
+    Cancels the clone operation for the specified repository and
+    cleans up any partial files.
+    """
+    try:
+        success = await kenobi_agent.repository_service.cancel_clone(repo_id)
+        
+        if success:
+            return {
+                "status": "success",
+                "message": f"Clone operation for repository {repo_id} cancelled successfully"
+            }
+        else:
+            return {
+                "status": "error",
+                "message": f"Failed to cancel clone operation for repository {repo_id}"
+            }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel clone: {str(e)}")
 
 # ========== Phase 2: Advanced Kenobi Endpoints ==========
 

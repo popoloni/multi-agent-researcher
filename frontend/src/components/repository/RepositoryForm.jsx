@@ -1,6 +1,22 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
-import LoadingSpinner from '../common/LoadingSpinner';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Tabs,
+  Tab,
+  Box,
+  TextField,
+  Typography,
+  IconButton,
+  Alert
+} from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
+import GitHubRepositorySearch from './GitHubRepositorySearch';
+import CloneProgress from './CloneProgress';
+import { githubService } from '../../services/github';
 
 const RepositoryForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({

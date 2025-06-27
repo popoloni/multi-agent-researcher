@@ -4,14 +4,20 @@ Repository management service for Kenobi agent
 import os
 import uuid
 import subprocess
+import asyncio
+import shutil
+import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 from datetime import datetime
 
 from app.models.repository_schemas import (
-    Repository, RepositoryAnalysis, ParsedFile, LanguageType
+    Repository, RepositoryAnalysis, ParsedFile, LanguageType, CloneStatus, CloneProgressUpdate
 )
 from app.tools.code_parser import CodeParser
+from app.services.github_service import github_service
+
+logger = logging.getLogger(__name__)
 
 class RepositoryService:
     """Service for managing and analyzing repositories"""
@@ -20,6 +26,7 @@ class RepositoryService:
         self.code_parser = CodeParser()
         self.repositories: Dict[str, Repository] = {}
         self.analyses: Dict[str, RepositoryAnalysis] = {}
+        self.clone_progress_callbacks: Dict[str, Callable] = {}
     
     async def clone_repository(self, repo_url: str, local_path: Optional[str] = None) -> Repository:
         """Clone a repository from URL"""
@@ -41,6 +48,267 @@ class RepositoryService:
             
         except subprocess.CalledProcessError as e:
             raise Exception(f"Failed to clone repository: {e.stderr.decode()}")
+    
+    async def clone_github_repository(
+        self, 
+        owner: str, 
+        repo: str, 
+        branch: str = "main",
+        local_name: Optional[str] = None,
+        progress_callback: Optional[Callable] = None
+    ) -> Repository:
+        """
+        Clone a GitHub repository with enhanced progress tracking and error handling
+        
+        Args:
+            owner: GitHub repository owner
+            repo: Repository name
+            branch: Branch to clone (default: main)
+            local_name: Local directory name (default: repo name)
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            Repository object
+        """
+        repo_id = str(uuid.uuid4())
+        
+        try:
+            # Update progress: Starting
+            await self._update_clone_progress(
+                repo_id, CloneStatus.PENDING, 0.0, 
+                "Validating repository access...", progress_callback
+            )
+            
+            # Validate repository access
+            if not await github_service.validate_repository_access(owner, repo):
+                raise Exception(f"Repository {owner}/{repo} not found or not accessible")
+            
+            # Get repository metadata
+            github_metadata = await github_service.get_repository_info(owner, repo)
+            
+            # Update progress: Preparing
+            await self._update_clone_progress(
+                repo_id, CloneStatus.CLONING, 10.0,
+                "Preparing clone operation...", progress_callback
+            )
+            
+            # Prepare local path
+            local_dir_name = local_name or repo
+            local_path = f"/tmp/kenobi_repos/{local_dir_name}"
+            
+            # Clean up existing directory if it exists
+            if os.path.exists(local_path):
+                shutil.rmtree(local_path)
+            
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            
+            # Update progress: Cloning
+            await self._update_clone_progress(
+                repo_id, CloneStatus.CLONING, 20.0,
+                f"Cloning repository from GitHub...", progress_callback
+            )
+            
+            # Clone repository with progress tracking
+            clone_url = github_metadata['clone_url']
+            await self._clone_with_progress(
+                clone_url, local_path, branch, repo_id, progress_callback
+            )
+            
+            # Update progress: Analyzing
+            await self._update_clone_progress(
+                repo_id, CloneStatus.CLONING, 80.0,
+                "Analyzing repository structure...", progress_callback
+            )
+            
+            # Create repository object with GitHub metadata
+            repository = await self._create_repository_from_path(
+                local_path, clone_url, repo_id, owner, repo, branch, github_metadata
+            )
+            
+            # Update progress: Completed
+            await self._update_clone_progress(
+                repo_id, CloneStatus.COMPLETED, 100.0,
+                "Repository cloned successfully!", progress_callback
+            )
+            
+            return repository
+            
+        except Exception as e:
+            # Update progress: Failed
+            await self._update_clone_progress(
+                repo_id, CloneStatus.FAILED, 0.0,
+                f"Clone failed: {str(e)}", progress_callback, error=str(e)
+            )
+            
+            # Clean up on failure
+            local_path = f"/tmp/kenobi_repos/{local_name or repo}"
+            if os.path.exists(local_path):
+                shutil.rmtree(local_path)
+            
+            raise Exception(f"Failed to clone GitHub repository {owner}/{repo}: {str(e)}")
+    
+    async def _clone_with_progress(
+        self, 
+        clone_url: str, 
+        local_path: str, 
+        branch: str,
+        repo_id: str,
+        progress_callback: Optional[Callable] = None
+    ):
+        """Clone repository with progress tracking"""
+        try:
+            # Clone with specific branch
+            cmd = ['git', 'clone', '--branch', branch, '--single-branch', clone_url, local_path]
+            
+            # Run git clone
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            # Monitor progress (simplified - git clone doesn't provide detailed progress)
+            progress_steps = [30.0, 40.0, 50.0, 60.0, 70.0]
+            for i, progress in enumerate(progress_steps):
+                await asyncio.sleep(0.5)  # Small delay to simulate progress
+                await self._update_clone_progress(
+                    repo_id, CloneStatus.CLONING, progress,
+                    f"Downloading repository files... ({i+1}/{len(progress_steps)})",
+                    progress_callback
+                )
+            
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode != 0:
+                error_msg = stderr.decode() if stderr else "Unknown git error"
+                raise Exception(f"Git clone failed: {error_msg}")
+                
+        except Exception as e:
+            logger.error(f"Clone with progress failed: {str(e)}")
+            raise
+    
+    async def _create_repository_from_path(
+        self,
+        local_path: str,
+        url: str,
+        repo_id: str,
+        github_owner: str,
+        github_repo: str,
+        branch: str,
+        github_metadata: Dict[str, Any]
+    ) -> Repository:
+        """Create repository object from local path with GitHub metadata"""
+        
+        repo_name = os.path.basename(local_path)
+        
+        # Detect primary language and framework
+        language, framework = self._detect_language_and_framework(local_path)
+        
+        # Calculate repository statistics
+        file_count, line_count, size_bytes = self._calculate_repo_stats(local_path)
+        
+        # Create repository with GitHub metadata
+        repository = Repository(
+            id=repo_id,
+            name=repo_name,
+            url=url,
+            local_path=local_path,
+            language=language,
+            framework=framework,
+            description=github_metadata.get('description'),
+            indexed_at=datetime.utcnow(),
+            file_count=file_count,
+            line_count=line_count,
+            size_bytes=size_bytes,
+            github_owner=github_owner,
+            github_repo=github_repo,
+            clone_status=CloneStatus.COMPLETED,
+            clone_progress=100.0,
+            github_metadata=github_metadata,
+            branch=branch
+        )
+        
+        # Store repository
+        self.repositories[repo_id] = repository
+        return repository
+    
+    async def _update_clone_progress(
+        self,
+        repo_id: str,
+        status: CloneStatus,
+        progress: float,
+        message: str,
+        progress_callback: Optional[Callable] = None,
+        error: Optional[str] = None
+    ):
+        """Update clone progress and notify callback if provided"""
+        
+        progress_update = CloneProgressUpdate(
+            repository_id=repo_id,
+            status=status,
+            progress=progress,
+            message=message,
+            error=error
+        )
+        
+        # Update repository if it exists
+        if repo_id in self.repositories:
+            self.repositories[repo_id].clone_status = status
+            self.repositories[repo_id].clone_progress = progress
+        
+        # Call progress callback if provided
+        if progress_callback:
+            try:
+                await progress_callback(progress_update)
+            except Exception as e:
+                logger.error(f"Progress callback failed: {str(e)}")
+        
+        logger.info(f"Clone progress [{repo_id}]: {status.value} - {progress:.1f}% - {message}")
+    
+    def register_clone_progress_callback(self, repo_id: str, callback: Callable):
+        """Register a progress callback for a specific repository clone"""
+        self.clone_progress_callbacks[repo_id] = callback
+    
+    def unregister_clone_progress_callback(self, repo_id: str):
+        """Unregister a progress callback"""
+        self.clone_progress_callbacks.pop(repo_id, None)
+    
+    async def get_clone_status(self, repo_id: str) -> Optional[CloneProgressUpdate]:
+        """Get current clone status for a repository"""
+        if repo_id in self.repositories:
+            repo = self.repositories[repo_id]
+            return CloneProgressUpdate(
+                repository_id=repo_id,
+                status=repo.clone_status,
+                progress=repo.clone_progress,
+                message=f"Repository {repo.name} - {repo.clone_status.value}",
+                error=None
+            )
+        return None
+    
+    async def cancel_clone(self, repo_id: str) -> bool:
+        """Cancel an ongoing clone operation"""
+        try:
+            # Update status to failed
+            await self._update_clone_progress(
+                repo_id, CloneStatus.FAILED, 0.0,
+                "Clone operation cancelled by user"
+            )
+            
+            # Clean up partial clone if it exists
+            if repo_id in self.repositories:
+                repo = self.repositories[repo_id]
+                if os.path.exists(repo.local_path):
+                    shutil.rmtree(repo.local_path)
+                
+                # Remove from repositories
+                del self.repositories[repo_id]
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to cancel clone {repo_id}: {str(e)}")
+            return False
     
     async def scan_local_directory(self, path: str, url: Optional[str] = None) -> Repository:
         """Scan a local directory and create repository metadata"""
