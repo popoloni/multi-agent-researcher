@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Researcher</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/phase2.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-robot"></i>
+                <span>Multi-Agent Researcher</span>
+            </div>
+            <div class="nav-menu" id="nav-menu">
+                <a href="#home" class="nav-link active" data-section="home">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="#research" class="nav-link" data-section="research">
+                    <i class="fas fa-search"></i> Research
+                </a>
+                <a href="#repository" class="nav-link" data-section="repository">
+                    <i class="fas fa-code-branch"></i> Repository
+                </a>
+                <a href="#status" class="nav-link" data-section="status">
+                    <i class="fas fa-chart-line"></i> Status
+                </a>
+            </div>
+            <div class="nav-toggle" id="nav-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Home Section -->
+        <section id="home" class="section active">
+            <div class="container">
+                <div class="hero">
+                    <h1>Multi-Agent Research System</h1>
+                    <p class="hero-subtitle">AI-powered research and code analysis platform</p>
+                    <div class="hero-stats">
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-research">0</div>
+                            <div class="stat-label">Research Tasks</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-repos">0</div>
+                            <div class="stat-label">Repositories</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="system-status">
+                                <i class="fas fa-circle status-indicator" id="status-indicator"></i>
+                            </div>
+                            <div class="stat-label">System Status</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card" onclick="showSection('research')">
+                        <div class="feature-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <h3>AI Research</h3>
+                        <p>Conduct comprehensive research using multiple AI agents working in parallel</p>
+                        <div class="feature-action">
+                            <span>Start Research <i class="fas fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+
+                    <div class="feature-card" onclick="showSection('repository')">
+                        <div class="feature-icon">
+                            <i class="fas fa-code-branch"></i>
+                        </div>
+                        <h3>Code Analysis</h3>
+                        <p>Analyze repositories for quality, dependencies, and architectural insights</p>
+                        <div class="feature-action">
+                            <span>Analyze Code <i class="fas fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+
+                    <div class="feature-card" onclick="showSection('status')">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>System Monitor</h3>
+                        <p>Monitor system performance, API status, and real-time analytics</p>
+                        <div class="feature-action">
+                            <span>View Status <i class="fas fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Research Section -->
+        <section id="research" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <h2><i class="fas fa-search"></i> AI Research</h2>
+                    <p>Submit research queries and get comprehensive reports from multiple AI agents</p>
+                </div>
+
+                <div class="research-interface">
+                    <div class="research-form-container">
+                        <form id="research-form" class="research-form">
+                            <div class="form-group">
+                                <label for="research-query">Research Query</label>
+                                <textarea 
+                                    id="research-query" 
+                                    name="query" 
+                                    placeholder="Enter your research question (e.g., 'What are the latest trends in AI agent development?')"
+                                    rows="4"
+                                    required
+                                ></textarea>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="max-subagents">Max Sub-agents</label>
+                                    <select id="max-subagents" name="max_subagents">
+                                        <option value="2">2 agents</option>
+                                        <option value="3" selected>3 agents</option>
+                                        <option value="4">4 agents</option>
+                                        <option value="5">5 agents</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="max-iterations">Max Iterations</label>
+                                    <select id="max-iterations" name="max_iterations">
+                                        <option value="1">1 iteration</option>
+                                        <option value="2" selected>2 iterations</option>
+                                        <option value="3">3 iterations</option>
+                                        <option value="4">4 iterations</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="button" id="demo-research-btn" class="btn btn-secondary">
+                                    <i class="fas fa-play"></i> Run Demo
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-rocket"></i> Start Research
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="research-results" id="research-results">
+                        <div class="results-placeholder">
+                            <i class="fas fa-search"></i>
+                            <p>Submit a research query to see results here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Repository Section -->
+        <section id="repository" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <h2><i class="fas fa-code-branch"></i> Repository Analysis</h2>
+                    <p>Analyze code repositories for quality, dependencies, and insights</p>
+                </div>
+
+                <div class="repository-interface">
+                    <div class="repo-form-container">
+                        <form id="repository-form" class="repository-form">
+                            <div class="form-group">
+                                <label for="repo-path">Repository Path</label>
+                                <input 
+                                    type="text" 
+                                    id="repo-path" 
+                                    name="path" 
+                                    placeholder="Enter local path (e.g., /path/to/repository) or Git URL"
+                                    required
+                                />
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Analyze Repository
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="repository-results" id="repository-results">
+                        <div class="results-placeholder">
+                            <i class="fas fa-code-branch"></i>
+                            <p>Enter a repository path to start analysis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Status Section -->
+        <section id="status" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-line"></i> System Status</h2>
+                    <p>Monitor system health, API endpoints, and performance metrics</p>
+                </div>
+
+                <!-- Real-time Metrics Dashboard -->
+                <div id="metrics-dashboard" class="metrics-dashboard">
+                    <!-- Metrics will be populated by JavaScript -->
+                </div>
+
+                <!-- Status Cards with Enhanced Real-time Updates -->
+                <div class="status-grid">
+                    <div class="status-card enhanced" id="api-health-card">
+                        <div class="status-header">
+                            <h3>API Health</h3>
+                            <div class="status-indicator" id="api-status">
+                                <div class="pulse"></div>
+                                <span id="api-status-text">Checking...</span>
+                            </div>
+                        </div>
+                        <div class="status-content" id="api-health-content">
+                            <div class="loading">Checking API status...</div>
+                        </div>
+                    </div>
+
+                    <div class="status-card enhanced" id="ollama-status-card">
+                        <div class="status-header">
+                            <h3>Ollama Status</h3>
+                            <div class="status-indicator" id="ollama-status">
+                                <div class="pulse"></div>
+                                <span id="ollama-status-text">Checking...</span>
+                            </div>
+                        </div>
+                        <div class="status-content" id="ollama-status-content">
+                            <div class="loading">Checking Ollama status...</div>
+                        </div>
+                    </div>
+
+                    <div class="status-card enhanced" id="models-status-card">
+                        <div class="status-header">
+                            <h3>Available Models</h3>
+                            <div class="status-indicator" id="models-status">
+                                <div class="pulse"></div>
+                                <span id="models-status-text">Loading...</span>
+                            </div>
+                        </div>
+                        <div class="status-content" id="models-content">
+                            <div class="loading">Loading model information...</div>
+                        </div>
+                    </div>
+
+                    <div class="status-card enhanced" id="tools-status-card">
+                        <div class="status-header">
+                            <h3>Available Tools</h3>
+                            <div class="status-indicator" id="tools-status">
+                                <div class="pulse"></div>
+                                <span id="tools-status-text">Loading...</span>
+                            </div>
+                        </div>
+                        <div class="status-content" id="tools-content">
+                            <div class="loading">Loading tools information...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Performance Charts -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">System Performance</h3>
+                        <div class="chart-controls">
+                            <button class="chart-control active" data-timeframe="1h">1H</button>
+                            <button class="chart-control" data-timeframe="6h">6H</button>
+                            <button class="chart-control" data-timeframe="24h">24H</button>
+                        </div>
+                    </div>
+                    <div id="performance-chart" style="height: 300px;"></div>
+                </div>
+
+                <!-- Live Activity Feed -->
+                <div class="live-feed">
+                    <div class="live-feed-header">
+                        <h3 class="live-feed-title">Live Activity</h3>
+                        <div class="live-feed-status">
+                            <div class="pulse" style="background: #34a853;"></div>
+                            <span>Live</span>
+                        </div>
+                    </div>
+                    <div class="live-feed-content" id="live-activity-feed">
+                        <div class="live-feed-item">
+                            <span>System monitoring started</span>
+                            <span class="live-feed-timestamp" id="start-timestamp"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p id="loading-text">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Real-time Notifications -->
+    <div id="notification-container" class="notification-container"></div>
+
+    <!-- Progress Overlay -->
+    <div id="progress-overlay" class="progress-overlay" style="display: none;">
+        <div class="progress-modal">
+            <h3 class="progress-title" id="progress-title">Processing...</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+            </div>
+            <div class="progress-text" id="progress-text">0%</div>
+            <div class="progress-steps" id="progress-steps"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script src="js/realtime.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
