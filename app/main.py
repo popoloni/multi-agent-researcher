@@ -1218,9 +1218,7 @@ async def analyze_repository_comprehensive(request: Dict[str, str]) -> Dict[str,
         if not repository_id:
             raise HTTPException(status_code=400, detail="repository_id is required")
         
-        from app.agents.repository_analysis_agent import RepositoryAnalysisAgent
-        repo_agent = RepositoryAnalysisAgent()
-        result = await repo_agent.analyze_repository_comprehensive(repository_id)
+        result = await kenobi_agent.repository_agent.analyze_repository_comprehensive(repository_id)
         return result
         
     except Exception as e:
@@ -1364,6 +1362,94 @@ async def stop_monitoring() -> Dict[str, Any]:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Stop monitoring failed: {str(e)}")
+
+# ==================== Additional Phase 4 API Endpoints ====================
+
+@app.post("/kenobi/repositories/comprehensive-analysis")
+async def comprehensive_repository_analysis(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Perform comprehensive repository analysis using Repository Analysis Agent
+    """
+    try:
+        repository_path = request.get('repository_path')
+        repository_name = request.get('repository_name')
+        
+        if not repository_path or not repository_name:
+            raise HTTPException(status_code=400, detail="repository_path and repository_name are required")
+        
+        result = await kenobi_agent.comprehensive_repository_analysis(repository_path, repository_name)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Comprehensive analysis failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/health")
+async def monitor_repository_health(repository_id: str) -> Dict[str, Any]:
+    """
+    Monitor repository health with real-time metrics
+    """
+    try:
+        result = await kenobi_agent.monitor_repository_health(repository_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Health monitoring failed: {str(e)}")
+
+@app.post("/kenobi/repositories/batch-analysis")
+async def batch_analyze_repositories(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Batch analysis of multiple repositories
+    """
+    try:
+        repository_paths = request.get('repository_paths', [])
+        
+        if not repository_paths:
+            raise HTTPException(status_code=400, detail="repository_paths is required")
+        
+        # Convert to list of tuples if needed
+        if isinstance(repository_paths[0], dict):
+            repository_paths = [(item['path'], item['name']) for item in repository_paths]
+        
+        result = await kenobi_agent.batch_analyze_repositories(repository_paths)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch analysis failed: {str(e)}")
+
+@app.post("/kenobi/repositories/compare")
+async def compare_repositories(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compare multiple repositories across various metrics
+    """
+    try:
+        repository_ids = request.get('repository_ids', [])
+        
+        if not repository_ids or len(repository_ids) < 2:
+            raise HTTPException(status_code=400, detail="At least 2 repository_ids are required")
+        
+        result = await kenobi_agent.compare_repositories(repository_ids)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Repository comparison failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/insights")
+async def generate_repository_insights(repository_id: str) -> Dict[str, Any]:
+    """
+    Generate comprehensive insights for a repository using all Phase 4 capabilities
+    """
+    try:
+        result = await kenobi_agent.generate_repository_insights(repository_id)
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Insight generation failed: {str(e)}")
 
 # Startup and shutdown events
 @app.on_event("startup")

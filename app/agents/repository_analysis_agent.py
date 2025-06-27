@@ -21,17 +21,21 @@ from app.engines.vector_service import VectorService
 class RepositoryAnalysisAgent(BaseAgent):
     """Specialized agent for deep repository analysis and insights"""
     
-    def __init__(self, model: str = "llama3.1:8b", provider: str = "ollama"):
+    def __init__(self, model: str = "llama3.1:8b", provider: str = "ollama", 
+                 repository_service=None, indexing_service=None, 
+                 vector_service=None, quality_engine=None):
         super().__init__(
             model=model,
             name="Repository Analysis Agent"
         )
         
-        self.repository_service = RepositoryService()
+        # Use provided services or create new ones
+        self.repository_service = repository_service or RepositoryService()
         self.dependency_analyzer = DependencyAnalyzer()
-        self.quality_engine = QualityEngine()
+        self.quality_engine = quality_engine or QualityEngine()
         self.ai_engine = AIEngine()
-        self.vector_service = VectorService()
+        self.vector_service = vector_service or VectorService()
+        self.indexing_service = indexing_service
         
         # Analysis cache
         self.analysis_cache: Dict[str, Dict] = {}
@@ -112,7 +116,10 @@ Focus on code quality, maintainability, and architectural best practices."""
     async def _analyze_code_structure(self, repository: Repository) -> Dict[str, Any]:
         """Analyze code structure and organization"""
         try:
-            elements = await self.repository_service.indexing_service.get_repository_elements(repository.id)
+            if self.indexing_service:
+                elements = await self.indexing_service.get_repository_elements(repository.id)
+            else:
+                elements = []
             
             # Count by type
             type_counts = {}
@@ -611,3 +618,89 @@ Focus on code quality, maintainability, and architectural best practices."""
             k: v for k, v in self.analysis_cache.items()
             if v["timestamp"] > cutoff_time
         }
+    
+    async def generate_actionable_insights(self, repository_path: str, repository_name: str, insight_types: List[str] = None) -> Dict[str, Any]:
+        """Generate actionable insights for repository improvement"""
+        try:
+            if not insight_types:
+                insight_types = ['optimization', 'refactoring', 'testing', 'documentation', 'security']
+            
+            # Get comprehensive analysis
+            analysis = await self.analyze_repository_comprehensive(repository_path, repository_name)
+            
+            insights = {
+                'repository_name': repository_name,
+                'repository_path': repository_path,
+                'insights': [],
+                'summary': {},
+                'recommendations': []
+            }
+            
+            # Generate insights based on analysis
+            if 'optimization' in insight_types:
+                insights['insights'].append({
+                    'type': 'optimization',
+                    'title': 'Performance Optimization Opportunities',
+                    'description': f"Repository has {analysis.get('total_elements', 0)} elements with average quality score of {analysis.get('overall_score', 0):.2f}",
+                    'priority': 'medium',
+                    'actions': ['Review high-complexity functions', 'Optimize dependency structure', 'Improve code organization']
+                })
+            
+            if 'refactoring' in insight_types:
+                complexity_score = analysis.get('complexity', {}).get('complexity_score', 0)
+                insights['insights'].append({
+                    'type': 'refactoring',
+                    'title': 'Code Refactoring Opportunities',
+                    'description': f"Complexity score: {complexity_score:.2f}",
+                    'priority': 'high' if complexity_score < 0.5 else 'medium',
+                    'actions': ['Break down complex functions', 'Extract common patterns', 'Improve code structure']
+                })
+            
+            if 'testing' in insight_types:
+                insights['insights'].append({
+                    'type': 'testing',
+                    'title': 'Testing Strategy Recommendations',
+                    'description': 'Enhance test coverage and quality',
+                    'priority': 'high',
+                    'actions': ['Add unit tests', 'Implement integration tests', 'Set up automated testing']
+                })
+            
+            if 'documentation' in insight_types:
+                insights['insights'].append({
+                    'type': 'documentation',
+                    'title': 'Documentation Improvements',
+                    'description': 'Enhance code documentation and README',
+                    'priority': 'medium',
+                    'actions': ['Add function docstrings', 'Update README', 'Create API documentation']
+                })
+            
+            if 'security' in insight_types:
+                insights['insights'].append({
+                    'type': 'security',
+                    'title': 'Security Considerations',
+                    'description': 'Review security practices and dependencies',
+                    'priority': 'high',
+                    'actions': ['Audit dependencies', 'Review input validation', 'Check for security vulnerabilities']
+                })
+            
+            # Add summary
+            insights['summary'] = {
+                'total_insights': len(insights['insights']),
+                'high_priority': len([i for i in insights['insights'] if i['priority'] == 'high']),
+                'medium_priority': len([i for i in insights['insights'] if i['priority'] == 'medium']),
+                'overall_health': analysis.get('overall_score', 0)
+            }
+            
+            # Add recommendations from analysis
+            insights['recommendations'] = analysis.get('recommendations', [])
+            
+            return insights
+            
+        except Exception as e:
+            return {
+                'error': f"Failed to generate insights: {str(e)}",
+                'repository_name': repository_name,
+                'insights': [],
+                'summary': {},
+                'recommendations': []
+            }

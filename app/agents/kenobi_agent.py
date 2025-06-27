@@ -5,6 +5,7 @@ Enhanced with Phase 2 capabilities: semantic search, dependency analysis, and in
 from typing import List, Dict, Any, Optional
 import asyncio
 import json
+from datetime import datetime
 
 from app.agents.base_agent import BaseAgent
 from app.models.repository_schemas import (
@@ -19,6 +20,10 @@ from app.tools.embedding_tools import EmbeddingTools
 from app.engines.ai_engine import AIEngine, AnalysisRequest, AnalysisType, ModelComplexity
 from app.engines.vector_service import VectorService, VectorDocument
 from app.engines.quality_engine import QualityEngine
+from app.engines.analytics_engine import analytics_engine
+from app.services.cache_service import cache_service
+from app.agents.repository_analysis_agent import RepositoryAnalysisAgent
+from app.agents.dependency_agent import DependencyAnalysisAgent
 from app.core.config import settings
 
 class KenobiAgent(BaseAgent):
@@ -42,6 +47,20 @@ class KenobiAgent(BaseAgent):
         self.ai_engine = AIEngine()
         self.vector_service = VectorService()
         self.quality_engine = QualityEngine()
+        
+        # Phase 4 agents and services
+        self.analytics_engine = analytics_engine
+        self.cache_service = cache_service
+        self.repository_agent = RepositoryAnalysisAgent(
+            repository_service=self.repository_service,
+            indexing_service=self.indexing_service,
+            vector_service=self.vector_service,
+            quality_engine=self.quality_engine
+        )
+        self.dependency_agent = DependencyAnalysisAgent(
+            indexing_service=self.indexing_service,
+            vector_service=self.vector_service
+        )
         
     def get_system_prompt(self) -> str:
         return """You are Kenobi, a specialized AI agent for code analysis and reverse engineering.
@@ -833,4 +852,242 @@ Always think step by step and provide structured, actionable insights."""
             'average_quality_score': avg_score,
             'quality_grade': self.quality_engine._get_quality_grade(avg_score),
             'repository_summary': await self.quality_repository_summary(repository_id)
+        }
+    
+    async def comprehensive_repository_analysis(self, repository_path: str, repository_name: str) -> Dict[str, Any]:
+        """
+        Perform comprehensive repository analysis using the Repository Analysis Agent
+        """
+        try:
+            # Check cache first
+            cache_key = f"comprehensive_analysis:{repository_name}"
+            cached_result = await self.cache_service.get(cache_key)
+            if cached_result:
+                return cached_result
+            
+            # Use the provided repository path directly
+            # Perform comprehensive analysis
+            result = await self.repository_agent.analyze_repository_comprehensive(repository_path, repository_name)
+            
+            # Cache result for 1 hour
+            await self.cache_service.set(cache_key, result, ttl=3600)
+            
+            return result
+            
+        except Exception as e:
+            return {'error': f"Comprehensive analysis failed: {str(e)}"}
+    
+    async def monitor_repository_health(self, repository_id: str) -> Dict[str, Any]:
+        """
+        Monitor repository health with real-time metrics
+        """
+        try:
+            # Check cache first
+            cache_key = f"health_monitoring:{repository_id}"
+            cached_result = await self.cache_service.get(cache_key)
+            if cached_result:
+                return cached_result
+            
+            # Get repository
+            repository = await self.repository_service.get_repository_metadata(repository_id)
+            if not repository:
+                return {'error': f"Repository '{repository_id}' not found"}
+            
+            # Perform health monitoring
+            result = await self.repository_agent.monitor_repository_health(repository.local_path)
+            
+            # Cache result for 15 minutes
+            await self.cache_service.set(cache_key, result, ttl=900)
+            
+            return result
+            
+        except Exception as e:
+            return {'error': f"Health monitoring failed: {str(e)}"}
+    
+    async def batch_analyze_repositories(self, repository_paths: List[str], analysis_types: List[str] = None) -> Dict[str, Any]:
+        """
+        Perform batch analysis on multiple repositories
+        """
+        try:
+            cache_key = f"batch_analysis:{hash(str(repository_paths))}"
+            cached_result = await self.cache_service.get(cache_key)
+            if cached_result:
+                return cached_result
+            
+            # Default analysis types
+            if not analysis_types:
+                analysis_types = ['structure', 'quality', 'dependencies', 'security']
+            
+            # Perform batch analysis
+            batch_results = []
+            for repo_path in repository_paths:
+                repo_name = repo_path.split('/')[-1]
+                if 'comprehensive' in analysis_types:
+                    result = await self.repository_agent.analyze_repository_comprehensive(repo_path, repo_name)
+                else:
+                    # Perform selective analysis based on types
+                    result = await self._selective_repository_analysis(repo_path, repo_name, analysis_types)
+                
+                batch_results.append({
+                    'repository_path': repo_path,
+                    'repository_name': repo_name,
+                    'analysis': result
+                })
+            
+            # Compile batch summary
+            batch_summary = {
+                'total_repositories': len(repository_paths),
+                'analysis_types': analysis_types,
+                'batch_timestamp': datetime.now().isoformat(),
+                'repositories': batch_results,
+                'summary_statistics': self._calculate_batch_statistics(batch_results)
+            }
+            
+            # Cache result for 30 minutes
+            await self.cache_service.set(cache_key, batch_summary, ttl=1800)
+            
+            return batch_summary
+        except Exception as e:
+            return {'error': f"Batch analysis failed: {str(e)}"}
+    
+    async def compare_repositories(self, repository_ids: List[str], comparison_aspects: List[str] = None) -> Dict[str, Any]:
+        """
+        Compare two repositories across multiple dimensions
+        """
+        try:
+            if len(repository_ids) < 2:
+                return {'error': 'At least 2 repository IDs are required for comparison'}
+            
+            repository_id_1, repository_id_2 = repository_ids[0], repository_ids[1]
+            cache_key = f"repo_comparison:{repository_id_1}:{repository_id_2}"
+            cached_result = await self.cache_service.get(cache_key)
+            if cached_result:
+                return cached_result
+            
+            # Get repository metadata
+            repo1 = await self.repository_service.get_repository_metadata(repository_id_1)
+            repo2 = await self.repository_service.get_repository_metadata(repository_id_2)
+            
+            if not repo1 or not repo2:
+                return {'error': 'One or both repositories not found'}
+            
+            # Default comparison aspects
+            if not comparison_aspects:
+                comparison_aspects = ['structure', 'quality', 'dependencies', 'complexity']
+            
+            # Perform repository comparison
+            comparison_result = await self.dependency_agent.compare_repositories(
+                repo1.local_path, repo2.local_path, comparison_aspects
+            )
+            
+            # Add metadata
+            comparison_result.update({
+                'repository_1': {
+                    'id': repository_id_1,
+                    'name': repo1.name,
+                    'path': repo1.local_path
+                },
+                'repository_2': {
+                    'id': repository_id_2,
+                    'name': repo2.name,
+                    'path': repo2.local_path
+                },
+                'comparison_timestamp': datetime.now().isoformat(),
+                'comparison_aspects': comparison_aspects
+            })
+            
+            # Cache result for 45 minutes
+            await self.cache_service.set(cache_key, comparison_result, ttl=2700)
+            
+            return comparison_result
+        except Exception as e:
+            return {'error': f"Repository comparison failed: {str(e)}"}
+    
+    async def generate_repository_insights(self, repository_id: str, insight_types: List[str] = None) -> Dict[str, Any]:
+        """
+        Generate actionable insights for repository improvement
+        """
+        try:
+            cache_key = f"repo_insights:{repository_id}"
+            cached_result = await self.cache_service.get(cache_key)
+            if cached_result:
+                return cached_result
+            
+            # Get repository metadata
+            repository = await self.repository_service.get_repository_metadata(repository_id)
+            if not repository:
+                return {'error': f"Repository '{repository_id}' not found"}
+            
+            # Default insight types
+            if not insight_types:
+                insight_types = ['optimization', 'refactoring', 'testing', 'documentation', 'security']
+            
+            # Generate insights using repository agent
+            insights = await self.repository_agent.generate_actionable_insights(
+                repository.local_path, repository.name, insight_types
+            )
+            
+            # Add metadata
+            insights.update({
+                'repository_id': repository_id,
+                'repository_name': repository.name,
+                'insights_timestamp': datetime.now().isoformat(),
+                'insight_types': insight_types
+            })
+            
+            # Cache result for 1 hour
+            await self.cache_service.set(cache_key, insights, ttl=3600)
+            
+            return insights
+        except Exception as e:
+            return {'error': f"Insights generation failed: {str(e)}"}
+    
+    async def _selective_repository_analysis(self, repository_path: str, repository_name: str, analysis_types: List[str]) -> Dict[str, Any]:
+        """
+        Perform selective analysis based on specified types
+        """
+        results = {}
+        
+        if 'structure' in analysis_types:
+            results['structure'] = await self.repository_agent._analyze_code_structure(repository_path)
+        
+        if 'quality' in analysis_types:
+            results['quality'] = await self.repository_agent._analyze_repository_quality(repository_path)
+        
+        if 'dependencies' in analysis_types:
+            results['dependencies'] = await self.repository_agent._analyze_dependencies(repository_path)
+        
+        if 'security' in analysis_types:
+            results['security'] = await self.repository_agent._analyze_security_patterns(repository_path)
+        
+        return results
+    
+    def _calculate_batch_statistics(self, batch_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calculate summary statistics for batch analysis
+        """
+        total_repos = len(batch_results)
+        if total_repos == 0:
+            return {}
+        
+        # Extract health scores
+        health_scores = []
+        for result in batch_results:
+            analysis = result.get('analysis', {})
+            if 'overall_health_score' in analysis:
+                health_scores.append(analysis['overall_health_score'])
+        
+        if health_scores:
+            avg_health = sum(health_scores) / len(health_scores)
+            min_health = min(health_scores)
+            max_health = max(health_scores)
+        else:
+            avg_health = min_health = max_health = 0
+        
+        return {
+            'total_repositories': total_repos,
+            'average_health_score': avg_health,
+            'min_health_score': min_health,
+            'max_health_score': max_health,
+            'repositories_analyzed': len([r for r in batch_results if 'error' not in r.get('analysis', {})])
         }
