@@ -10,23 +10,26 @@ An advanced AI-powered code analysis and repository management platform with 61 
 ## 🚀 Quick Start
 
 ```bash
-# Clone and install
+# Clone the repository
 git clone https://github.com/popoloni/multi-agent-researcher.git
 cd multi-agent-researcher
-pip install -r requirements.txt
 
-# Start server
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+# Start all services (backend + Ollama)
+./start_dev.sh
 
-# Index and analyze a repository
-curl -X POST http://localhost:8080/kenobi/repositories/index \
-  -H "Content-Type: application/json" \
-  -d '{"path": "/path/to/repo", "name": "my-repo"}'
+# In a new terminal, start the frontend
+./start_ui.sh
 
-curl -X POST http://localhost:8080/kenobi/repositories/comprehensive-analysis \
-  -H "Content-Type: application/json" \
-  -d '{"repository_path": "/path/to/repo", "repository_name": "my-repo"}'
+# Check service status
+./check_status.sh
 ```
+
+**📖 For detailed setup instructions, see [SETUP_AND_DEPLOYMENT.md](SETUP_AND_DEPLOYMENT.md)**
+
+### Access the Application
+- **Frontend UI**: http://localhost:3000
+- **Backend API**: http://localhost:12000
+- **API Documentation**: http://localhost:12000/docs
 
 ## ✨ Key Features
 
