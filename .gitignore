@@ -71,3 +71,94 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+
+# Node.js and Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+.pnp
+.pnp.js
+package-lock.json.bak
+yarn.lock.bak
+
+# Frontend Build Artifacts
+build/
+dist/
+.next/
+.nuxt/
+.vuepress/
+out/
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Screenshots and Media
+screenshot*.png
+screen_*.png
+capture_*.png
+demo_*.png
+test_*.png
+screenshots/
+captures/
+media/temp/
+
+# Development and Runtime Files
+server.log
+frontend.log
+server_ui.log
+ollama.log
+*.prof
+*.trace
+*.heap
+
+# Temporary Directories
+tmp/
+temp/
+/tmp/kenobi_repos/
+
+# Backup Files
+*.bak
+*.backup
+*.orig
+
+# Database Files
+*.sqlite
+*.sqlite3
+*.db
+
+# Environment Files
+.env.development.local
+.env.production.local
+.env.test.local
+config.local.json
+
+# Docker
+docker-compose.override.yml
+.dockerignore.bak
+
+# Test Artifacts
+test-results/
+coverage/
+.nyc_output/
+junit.xml
+
+# Large Files (add specific patterns as needed)
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Application Specific
+static/uploads/
+downloads/
+uploads/
+
+# Git Artifacts
+.git/gc.log
+
+# Monitoring and Analytics
+*.analytics
+*.metrics
