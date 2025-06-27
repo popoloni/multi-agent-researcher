@@ -51,6 +51,13 @@ class Settings:
             "recommended_use": "Fast inference, resource-constrained environments",
             "size": "2.0GB"
         },
+        "llama3.2:1b": {
+            "display_name": "Llama 3.2 1B",
+            "context_length": 128000,
+            "description": "Meta's Llama 3.2 1B model - ultra-lightweight and fast",
+            "recommended_use": "Very fast inference, minimal resource usage",
+            "size": "1.3GB"
+        },
         "mistral:7b": {
             "display_name": "Mistral 7B",
             "context_length": 32768,

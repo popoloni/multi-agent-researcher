@@ -143,7 +143,7 @@ const RepositoryRow = ({ repository, onDelete }) => {
           </div>
         )}
       </div>
-      <div className="col-span-4 text-gray-600 truncate">{repository.path}</div>
+      <div className="col-span-4 text-gray-600 truncate">{repository.path || repository.url || 'N/A'}</div>
       <div className="col-span-2">
         <StatusBadge status={repository.status || 'indexed'} />
       </div>
@@ -169,7 +169,7 @@ const RepositoryRow = ({ repository, onDelete }) => {
         >
           <Eye className="w-4 h-4" />
         </Link>
-        {repository.path.startsWith('http') && (
+        {repository.path && repository.path.startsWith('http') && (
           <a
             href={repository.path}
             target="_blank"

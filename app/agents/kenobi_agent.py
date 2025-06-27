@@ -1107,15 +1107,14 @@ Always think step by step and provide structured, actionable insights."""
                 }
 
             # Search for relevant code elements based on the message
-            search_filters = SearchFilters(
-                repository_ids=[repository_id],
-                languages=None,
-                element_types=None,
-                max_results=10
-            )
+            search_context = {
+                "repository_id": repository_id,
+                "max_results": 10,
+                "branch": branch
+            }
             
             # Use semantic search to find relevant code
-            search_results = await self.search_code_semantic(message, search_filters)
+            search_results = await self.search_code_semantic(message, search_context)
             
             # Extract relevant context from search results
             context_elements = []
