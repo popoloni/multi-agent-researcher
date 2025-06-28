@@ -4,7 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Repositories from './pages/Repositories';
 import Chat from './pages/Chat';
 import Documentation from './pages/Documentation';
-import FunctionalitiesRegistry from './components/documentation/FunctionalitiesRegistry';
+import FunctionalitiesPage from './pages/FunctionalitiesPage';
 import Layout from './components/layout/Layout';
 import './styles/globals.css';
 
@@ -17,11 +17,7 @@ function App() {
           <Route path="/repositories" element={<Repositories />} />
           <Route 
             path="/repositories/:repositoryId/functionalities" 
-            element={
-              <Layout>
-                <FunctionalitiesRegistry />
-              </Layout>
-            } 
+            element={<FunctionalitiesPage />} 
           />
           <Route 
             path="/repositories/:repositoryId/documentation" 

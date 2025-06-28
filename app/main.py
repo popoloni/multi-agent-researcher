@@ -7,6 +7,7 @@ import os
 from typing import Dict, Any, List
 from uuid import UUID
 import asyncio
+from datetime import datetime
 
 from app.agents.lead_agent import LeadResearchAgent
 from app.agents.citation_agent import CitationAgent
@@ -457,7 +458,7 @@ async def get_ollama_status() -> Dict[str, Any]:
 # Kenobi Code Analysis Endpoints
 
 @app.post("/kenobi/repositories/index")
-async def index_repository(repo_request: RepositoryIndexRequest) -> Dict[str, Any]:
+async def index_repository(repo_request: RepositoryIndexRequest):
     """
     Index a repository for code analysis
     
@@ -465,10 +466,35 @@ async def index_repository(repo_request: RepositoryIndexRequest) -> Dict[str, An
     and extracts code elements, dependencies, and metadata.
     """
     try:
-        # Analyze the repository
-        analysis = await kenobi_agent.analyze_repository(repo_request.path)
+        local_path = repo_request.path
         
-        return {
+        # Check if this is a GitHub URL that needs to be cloned first
+        if repo_request.path.startswith(('https://github.com/', 'http://github.com/', 'git@github.com:')):
+            # Parse GitHub URL to extract owner and repo
+            import re
+            github_pattern = r'(?:https?://github\.com/|git@github\.com:)([^/]+)/([^/\.]+)(?:\.git)?/?$'
+            match = re.match(github_pattern, repo_request.path)
+            
+            if not match:
+                raise HTTPException(status_code=400, detail="Invalid GitHub URL format")
+            
+            owner, repo_name = match.groups()
+            
+            # Clone the repository first
+            repository = await kenobi_agent.repository_service.clone_github_repository(
+                owner=owner,
+                repo=repo_name,
+                branch="main",  # Default branch
+                local_name=repo_request.name or repo_name
+            )
+            
+            # Use the local path from the cloned repository
+            local_path = repository.local_path
+        
+        # Analyze the repository
+        analysis = await kenobi_agent.analyze_repository(local_path)
+        
+        response_data = {
             "status": "success",
             "repository_id": analysis.repository.id,
             "repository_name": analysis.repository.name,
@@ -480,6 +506,8 @@ async def index_repository(repo_request: RepositoryIndexRequest) -> Dict[str, An
             "frameworks_detected": analysis.frameworks_detected,
             "categories_used": analysis.categories_used
         }
+        
+        return JSONResponse(content=response_data)
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Repository indexing failed: {str(e)}")
@@ -621,6 +649,247 @@ async def list_repositories() -> Dict[str, Any]:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Repository listing failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}")
+async def get_repository_details(repository_id: str) -> Dict[str, Any]:
+    """
+    Get details for a specific repository
+    
+    Returns detailed information about a single repository including
+    metadata, file counts, and indexing status.
+    """
+    try:
+        repositories = await kenobi_agent.repository_service.list_repositories()
+        
+        # Find the repository by ID
+        repository = None
+        for repo in repositories:
+            if repo.id == repository_id:
+                repository = repo
+                break
+        
+        if not repository:
+            raise HTTPException(status_code=404, detail=f"Repository with ID {repository_id} not found")
+        
+        return {
+            "id": repository.id,
+            "name": repository.name,
+            "language": repository.language.value,
+            "framework": repository.framework,
+            "file_count": repository.file_count,
+            "line_count": repository.line_count,
+            "indexed_at": repository.indexed_at.isoformat(),
+            "local_path": repository.local_path
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Repository details retrieval failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/functionalities")
+async def get_repository_functionalities(repository_id: str, branch: str = "main") -> Dict[str, Any]:
+    """
+    Get functionalities registry for a repository
+    
+    Returns a list of functions, classes, and other code elements
+    that can be used for documentation generation.
+    """
+    try:
+        # Check if repository exists
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Get repository analysis which contains the functionalities
+        analysis = await kenobi_agent.repository_service.analyze_repository(repository_id)
+        
+        # Extract functionalities from the analysis
+        functionalities = []
+        
+        # Iterate through all files and their elements
+        for file in analysis.files:
+            for element in file.elements:
+                functionality = {
+                    "name": element.name,
+                    "type": element.element_type.value,
+                    "file": element.file_path,
+                    "description": element.description or "",
+                    "line_number": element.start_line,
+                    "end_line": element.end_line,
+                    "code_snippet": element.code_snippet[:200] + "..." if len(element.code_snippet) > 200 else element.code_snippet,
+                    "complexity_score": element.complexity_score,
+                    "categories": element.categories
+                }
+                functionalities.append(functionality)
+        
+        return {
+            "functionalities": functionalities,
+            "total_count": len(functionalities),
+            "branch": branch,
+            "repository_id": repository_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Functionalities retrieval failed: {str(e)}")
+
+@app.post("/kenobi/repositories/{repository_id}/documentation")
+async def generate_documentation(repository_id: str, options: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Generate documentation for a repository
+    
+    Creates comprehensive documentation including API docs, code analysis,
+    and architectural overview for the specified repository.
+    """
+    try:
+        if options is None:
+            options = {}
+        
+        branch = options.get("branch", "main")
+        
+        # Check if repository exists
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Get repository analysis
+        analysis = await kenobi_agent.repository_service.analyze_repository(repository_id)
+        
+        # Count elements by type
+        element_counts = {}
+        all_elements = []
+        for file in analysis.files:
+            for element in file.elements:
+                element_type = element.element_type.value
+                element_counts[element_type] = element_counts.get(element_type, 0) + 1
+                all_elements.append(element)
+        
+        # Generate documentation using the research agent
+        documentation_prompt = f"""
+        Generate comprehensive documentation for the repository with the following analysis:
+        
+        Repository: {analysis.repository.name}
+        Language: {analysis.repository.language.value}
+        Total Files: {len(analysis.files)}
+        Total Elements: {len(all_elements)}
+        Element Types: {element_counts}
+        
+        Please create documentation that includes:
+        1. Overview and purpose
+        2. Installation and setup instructions
+        3. API reference for key functions and classes
+        4. Usage examples
+        5. Architecture overview
+        
+        Focus on the most important functions and classes for users.
+        """
+        
+        # For now, let's create documentation directly without the research service
+        # to avoid complexity and demonstrate the functionality
+        
+        # Get functions and classes for API reference
+        functions = [elem for elem in all_elements if elem.element_type.value == "function"][:20]
+        classes = [elem for elem in all_elements if elem.element_type.value == "class"][:10]
+        
+        # Generate a comprehensive overview
+        overview = f"""
+# {analysis.repository.name} Documentation
+
+## Overview
+This is a {analysis.repository.language.value} repository with {len(analysis.files)} files and {len(all_elements)} code elements.
+
+## Key Statistics
+- **Language**: {analysis.repository.language.value}
+- **Total Files**: {len(analysis.files)}
+- **Total Functions**: {element_counts.get('function', 0)}
+- **Total Classes**: {element_counts.get('class', 0)}
+- **Total Variables**: {element_counts.get('variable', 0)}
+
+## Architecture
+The repository contains the following types of code elements:
+{chr(10).join([f"- **{k.title()}s**: {v}" for k, v in element_counts.items()])}
+
+## Installation
+```bash
+git clone <repository-url>
+cd {analysis.repository.name}
+# Follow language-specific installation instructions
+```
+
+## Usage
+This repository provides various functionalities organized across {len(analysis.files)} files.
+Key components include the main functions and classes listed in the API reference below.
+"""
+        
+        # Structure the documentation
+        documentation = {
+            "overview": overview.strip(),
+            "api_reference": {
+                "functions": [
+                    {
+                        "name": func.name,
+                        "description": func.description or "No description available",
+                        "file": func.file_path,
+                        "line": func.start_line,
+                        "code_snippet": func.code_snippet[:100] + "..." if len(func.code_snippet) > 100 else func.code_snippet
+                    }
+                    for func in functions
+                ],
+                "classes": [
+                    {
+                        "name": cls.name,
+                        "description": cls.description or "No description available",
+                        "file": cls.file_path,
+                        "line": cls.start_line,
+                        "code_snippet": cls.code_snippet[:100] + "..." if len(cls.code_snippet) > 100 else cls.code_snippet
+                    }
+                    for cls in classes
+                ]
+            },
+            "architecture": {
+                "total_files": len(analysis.files),
+                "total_elements": len(all_elements),
+                "element_counts": element_counts,
+                "language": analysis.repository.language.value,
+                "frameworks_detected": analysis.frameworks_detected
+            }
+        }
+        
+        return {
+            "documentation": documentation,
+            "repository_id": repository_id,
+            "branch": branch,
+            "generated_at": datetime.now().isoformat(),
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Documentation generation failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/documentation")
+async def get_documentation(repository_id: str, branch: str = "main") -> Dict[str, Any]:
+    """
+    Get existing documentation for a repository
+    
+    Returns previously generated documentation if available.
+    """
+    try:
+        # For now, return a placeholder since we don't have persistent storage
+        # In a real implementation, this would retrieve from a database
+        return {
+            "documentation": None,
+            "repository_id": repository_id,
+            "branch": branch,
+            "status": "not_generated",
+            "message": "No documentation found. Please generate documentation first."
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Documentation retrieval failed: {str(e)}")
 
 @app.get("/kenobi/status")
 async def get_kenobi_status() -> Dict[str, Any]:
