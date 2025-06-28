@@ -14,22 +14,42 @@ An advanced AI-powered code analysis and repository management platform with 61 
 git clone https://github.com/popoloni/multi-agent-researcher.git
 cd multi-agent-researcher
 
-# Start all services (backend + Ollama)
-./start_dev.sh
+# Make scripts executable
+chmod +x start_all.sh start_dev.sh start_ui.sh
 
-# In a new terminal, start the frontend
-./start_ui.sh
+# Start everything with one command
+./start_all.sh
 
-# Check service status
-./check_status.sh
+# Or start components individually:
+# ./start_dev.sh    # Start backend + Ollama
+# ./start_ui.sh     # Start frontend
 ```
 
 **📖 For detailed setup instructions, see [SETUP_AND_DEPLOYMENT.md](SETUP_AND_DEPLOYMENT.md)**
 
 ### Access the Application
-- **Frontend UI**: http://localhost:3000
+- **Frontend UI**: http://localhost:12001
 - **Backend API**: http://localhost:12000
 - **API Documentation**: http://localhost:12000/docs
+
+### Managing the System
+```bash
+# Start all services
+./start_all.sh
+
+# Check system status
+./start_all.sh status
+# or
+./check_status.sh
+
+# Stop all services
+./start_all.sh stop
+# or
+./stop_all.sh
+
+# Restart all services
+./start_all.sh restart
+```
 
 ## ✨ Key Features
 

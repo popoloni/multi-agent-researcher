@@ -1,67 +1,82 @@
 #!/bin/bash
+echo "🚀 Starting Multi-Agent Researcher Backend & Ollama..."
 
-# Multi-Agent Researcher Development Startup Script
-echo "🚀 Starting Multi-Agent Researcher in Development Mode..."
-
-# Check if Node.js is installed
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed. Please install Node.js first."
-    exit 1
+# Install Python dependencies if needed
+if ! pip show fastapi uvicorn ollama spacy > /dev/null 2>&1; then
+    echo "📦 Installing Python dependencies..."
+    pip install -r requirements.txt
+    
+    echo "📦 Installing spaCy language model..."
+    pip install spacy
+    python -m spacy download en_core_web_sm
 fi
 
-# Function to start backend
-start_backend() {
-    echo "🔧 Starting FastAPI backend..."
-    python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload &
-    BACKEND_PID=$!
-    echo "Backend started with PID: $BACKEND_PID"
-}
+# Check if Ollama is installed
+if ! command -v ollama &> /dev/null; then
+    echo "📦 Installing Ollama..."
+    curl -fsSL https://ollama.ai/install.sh | sh
+fi
 
-# Function to start frontend
-start_frontend() {
-    echo "⚛️ Starting React frontend..."
-    cd frontend
+# Check if Ollama is already running
+if curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
+    echo "✅ Ollama is already running"
+    OLLAMA_RUNNING=true
+else
+    echo "🔄 Starting Ollama service..."
+    ollama serve > ollama.log 2>&1 &
+    OLLAMA_PID=$!
+    echo "✅ Ollama started with PID: $OLLAMA_PID"
+    OLLAMA_RUNNING=false
     
-    # Install dependencies if node_modules doesn't exist
-    if [ ! -d "node_modules" ]; then
-        echo "📦 Installing frontend dependencies..."
-        npm install
-    fi
-    
-    # Set environment variable for API URL
-    export REACT_APP_API_URL=http://localhost:8080
-    
-    # Start development server
-    npm start &
-    FRONTEND_PID=$!
-    echo "Frontend started with PID: $FRONTEND_PID"
-    cd ..
-}
+    # Wait for Ollama to initialize
+    echo "⏳ Waiting for Ollama to initialize..."
+    for i in {1..10}; do
+        if curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
+            echo "✅ Ollama is now running"
+            break
+        fi
+        echo "  Waiting... ($i/10)"
+        sleep 2
+    done
+fi
 
-# Function to cleanup on exit
-cleanup() {
-    echo "🛑 Shutting down services..."
-    if [ ! -z "$BACKEND_PID" ]; then
-        kill $BACKEND_PID 2>/dev/null
-    fi
-    if [ ! -z "$FRONTEND_PID" ]; then
-        kill $FRONTEND_PID 2>/dev/null
-    fi
-    exit 0
-}
+# Pull required model if not exists
+echo "🔄 Ensuring llama3.2:1b model is available..."
+ollama pull llama3.2:1b
 
-# Set trap to cleanup on script exit
-trap cleanup SIGINT SIGTERM
+# Create .env file if it doesn't exist
+if [ ! -f .env ]; then
+    echo "📝 Creating .env file..."
+    cat > .env << EOL
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=12000
+DEBUG=true
 
-# Start services
-start_backend
-sleep 3
-start_frontend
+# Ollama Configuration
+OLLAMA_HOST=localhost
+OLLAMA_PORT=11434
+OLLAMA_MODEL=llama3.2:1b
 
-echo "✅ Development environment is running:"
-echo "   - Backend API: http://localhost:8080"
-echo "   - Frontend UI: http://localhost:3000"
-echo "   - Press Ctrl+C to stop all services"
+# Database Configuration
+DATABASE_URL=sqlite:///./kenobi.db
 
-# Wait for services
-wait
+# Logging
+LOG_LEVEL=INFO
+EOL
+fi
+
+# Start backend API
+echo "🔄 Starting backend API on port 12000..."
+python -m uvicorn app.main:app --host 0.0.0.0 --port 12000 --reload > server.log 2>&1 &
+API_PID=$!
+
+echo "✅ Services started successfully!"
+echo "📊 Status:"
+echo "  - Ollama: Running on port 11434 (logs: ollama.log)"
+echo "  - API: Running on port 12000 (logs: server.log)"
+echo "  - API URL: http://localhost:12000"
+echo "  - Health Check: curl http://localhost:12000/health"
+echo ""
+echo "💡 To stop services: pkill -f ollama && pkill -f uvicorn"
+echo "💡 To start the frontend: ./start_ui.sh"
