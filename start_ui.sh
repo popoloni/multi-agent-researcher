@@ -21,14 +21,20 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # Start development server
-echo "🔄 Starting React development server on port 12001..."
-PORT=12001 npm start > ../frontend.log 2>&1 &
+echo "🔄 Starting React development server on port 3000..."
+# Kill any existing processes on port 3000
+fuser -k 3000/tcp 2>/dev/null || true
+# Set environment variables to allow external access
+export HOST=0.0.0.0
+export PORT=3000
+export DANGEROUSLY_DISABLE_HOST_CHECK=true
+npm start > ../frontend.log 2>&1 &
 FRONTEND_PID=$!
 
 echo "✅ Frontend started successfully with PID: $FRONTEND_PID"
 echo "📊 Status:"
-echo "  - Frontend: Running on port 12001"
-echo "  - Frontend URL: http://localhost:12001"
+echo "  - Frontend: Running on port 3000"
+echo "  - Frontend URL: http://localhost:3000"
 echo "  - Logs: frontend.log"
 echo ""
 echo "💡 To stop frontend: kill $FRONTEND_PID"

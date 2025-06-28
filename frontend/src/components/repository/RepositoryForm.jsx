@@ -13,10 +13,11 @@ import {
   IconButton,
   Alert
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Close as X } from '@mui/icons-material';
 import GitHubRepositorySearch from './GitHubRepositorySearch';
 import CloneProgress from './CloneProgress';
 import { githubService } from '../../services/github';
+import LoadingSpinner from '../common/LoadingSpinner';
 
 const RepositoryForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
