@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Repositories from './pages/Repositories';
+import RepositoryDetails from './pages/RepositoryDetails';
 import Chat from './pages/Chat';
 import Documentation from './pages/Documentation';
 import FunctionalitiesPage from './pages/FunctionalitiesPage';
@@ -15,6 +16,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/repositories" element={<Repositories />} />
+          <Route path="/repositories/:repositoryId" element={<RepositoryDetails />} />
           <Route 
             path="/repositories/:repositoryId/functionalities" 
             element={<FunctionalitiesPage />} 

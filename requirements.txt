@@ -11,3 +11,5 @@ redis
 asyncio
 jinja2
 python-multipart
+networkx
+spacy

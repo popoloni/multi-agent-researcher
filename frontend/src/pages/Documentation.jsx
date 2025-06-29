@@ -144,6 +144,99 @@ const Documentation = () => {
     }
   };
 
+  // Convert API reference object to markdown
+  const convertApiReferenceToMarkdown = (apiRef) => {
+    if (!apiRef || typeof apiRef !== 'object') return '';
+
+    let markdown = '# API Reference\n\n';
+
+    // Functions section
+    if (apiRef.functions && apiRef.functions.length > 0) {
+      markdown += '## Functions\n\n';
+      apiRef.functions.forEach((func, index) => {
+        markdown += `### ${func.name}\n\n`;
+        if (func.description) {
+          markdown += `${func.description}\n\n`;
+        }
+        if (func.file && func.line) {
+          markdown += `**Location:** \`${func.file}:${func.line}\`\n\n`;
+        }
+        if (func.code_snippet) {
+          markdown += '```python\n' + func.code_snippet + '\n```\n\n';
+        }
+        markdown += '---\n\n';
+      });
+    }
+
+    // Classes section
+    if (apiRef.classes && apiRef.classes.length > 0) {
+      markdown += '## Classes\n\n';
+      apiRef.classes.forEach((cls, index) => {
+        markdown += `### ${cls.name}\n\n`;
+        if (cls.description) {
+          markdown += `${cls.description}\n\n`;
+        }
+        if (cls.file && cls.line) {
+          markdown += `**Location:** \`${cls.file}:${cls.line}\`\n\n`;
+        }
+        if (cls.code_snippet) {
+          markdown += '```python\n' + cls.code_snippet + '\n```\n\n';
+        }
+        markdown += '---\n\n';
+      });
+    }
+
+    return markdown;
+  };
+
+  // Convert architecture object to markdown
+  const convertArchitectureToMarkdown = (arch) => {
+    if (!arch || typeof arch !== 'object') return '';
+
+    let markdown = '# Architecture Documentation\n\n';
+
+    // Overview
+    markdown += '## Repository Architecture Overview\n\n';
+
+    if (arch.language) {
+      markdown += `**Primary Language:** ${arch.language}\n\n`;
+    }
+
+    if (arch.total_files) {
+      markdown += `**Total Files:** ${arch.total_files}\n\n`;
+    }
+
+    if (arch.total_elements) {
+      markdown += `**Total Code Elements:** ${arch.total_elements}\n\n`;
+    }
+
+    // Element breakdown
+    if (arch.element_counts) {
+      markdown += '## Code Element Distribution\n\n';
+      Object.entries(arch.element_counts).forEach(([type, count]) => {
+        markdown += `- **${type.charAt(0).toUpperCase() + type.slice(1)}s:** ${count}\n`;
+      });
+      markdown += '\n';
+    }
+
+    // Frameworks detected
+    if (arch.frameworks_detected && arch.frameworks_detected.length > 0) {
+      markdown += '## Detected Frameworks\n\n';
+      arch.frameworks_detected.forEach(framework => {
+        markdown += `- ${framework}\n`;
+      });
+      markdown += '\n';
+    }
+
+    // Architecture insights
+    markdown += '## Architecture Analysis\n\n';
+    markdown += 'This repository follows a structured approach with well-organized code elements. ';
+    markdown += `The codebase contains ${arch.total_elements || 0} total elements across ${arch.total_files || 0} files, `;
+    markdown += `indicating a ${arch.total_elements > 500 ? 'large-scale' : 'medium-scale'} project.\n\n`;
+
+    return markdown;
+  };
+
   // Handle doc type selection
   const handleDocTypeSelect = (docType) => {
     setSelectedDocType(docType);
@@ -242,7 +335,13 @@ const Documentation = () => {
           
           <TabsContent value="view">
             <DocumentationViewer 
-              content={documentation[selectedDocType] || ''}
+              content={
+                selectedDocType === 'api' ?
+                  convertApiReferenceToMarkdown(documentation['api_reference']) :
+                selectedDocType === 'architecture' ?
+                  convertArchitectureToMarkdown(documentation['architecture']) :
+                  documentation[selectedDocType] || ''
+              }
               title={
                 selectedDocType === 'overview' ? 'Repository Overview' :
                 selectedDocType === 'api' ? 'API Documentation' :

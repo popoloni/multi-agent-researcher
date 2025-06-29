@@ -49,6 +49,10 @@ if os.path.exists(frontend_build_path):
 research_service = ResearchService()
 kenobi_agent = KenobiAgent()
 
+# In-memory storage for generated documentation
+# In production, this should be replaced with a proper database
+documentation_storage = {}
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the React frontend"""
@@ -620,7 +624,8 @@ async def analyze_single_file(file_request: FileAnalysisRequest) -> Dict[str, An
         raise HTTPException(status_code=500, detail=f"File analysis failed: {str(e)}")
 
 @app.get("/kenobi/repositories")
-async def list_repositories() -> Dict[str, Any]:
+#async def list_repositories() -> Dict[str, Any]:
+async def list_repositories():
     """
     List all indexed repositories
     
@@ -857,14 +862,26 @@ Key components include the main functions and classes listed in the API referenc
             }
         }
         
-        return {
+        # return {
+        #     "documentation": documentation,
+        #     "repository_id": repository_id,
+        #     "branch": branch,
+        #     "generated_at": datetime.now().isoformat(),
+        #     "status": "success"
+        # }
+        
+        # Store the generated documentation in memory
+        doc_key = f"{repository_id}:{branch}"
+        documentation_storage[doc_key] = {
             "documentation": documentation,
             "repository_id": repository_id,
             "branch": branch,
             "generated_at": datetime.now().isoformat(),
             "status": "success"
         }
-        
+
+        return documentation_storage[doc_key]
+
     except HTTPException:
         raise
     except Exception as e:
@@ -878,15 +895,27 @@ async def get_documentation(repository_id: str, branch: str = "main") -> Dict[st
     Returns previously generated documentation if available.
     """
     try:
-        # For now, return a placeholder since we don't have persistent storage
-        # In a real implementation, this would retrieve from a database
-        return {
-            "documentation": None,
-            "repository_id": repository_id,
-            "branch": branch,
-            "status": "not_generated",
-            "message": "No documentation found. Please generate documentation first."
-        }
+        # Check if documentation exists in storage
+        doc_key = f"{repository_id}:{branch}"
+
+        if doc_key in documentation_storage:
+            stored_doc = documentation_storage[doc_key]
+            return {
+                "documentation": stored_doc["documentation"],
+                "repository_id": repository_id,
+                "branch": branch,
+                "status": "generated",
+                "last_generated": stored_doc["generated_at"],
+                "message": "Documentation found"
+            }
+        else:
+            return {
+                "documentation": None,
+                "repository_id": repository_id,
+                "branch": branch,
+                "status": "not_generated",
+                "message": "No documentation found. Please generate documentation first."
+            }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Documentation retrieval failed: {str(e)}")
