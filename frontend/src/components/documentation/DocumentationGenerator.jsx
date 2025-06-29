@@ -20,22 +20,45 @@ const DocumentationGenerator = ({
     format: 'markdown' // 'markdown', 'html'
   });
   const [error, setError] = useState(null);
+  const [generationStatus, setGenerationStatus] = useState(null);
 
   const handleGenerateDocumentation = async () => {
     if (!repository || !repository.id) return;
     
     setError(null);
+    setGenerationStatus(null);
     
     try {
       if (onGenerationStart) {
         onGenerationStart();
       }
       
+      // Start async documentation generation
       const response = await documentationService.generateDocumentation(repository.id, options);
+      const taskId = response.data.task_id;
       
-      if (onGenerationComplete) {
-        onGenerationComplete(response.data);
+      // Poll for progress updates
+      const result = await documentationService.pollDocumentationStatus(
+        repository.id, 
+        taskId, 
+        (status) => {
+          setGenerationStatus(status);
+          // Update progress through callback
+          if (onGenerationStart) {
+            onGenerationStart({
+              progress: status.progress,
+              stage: status.current_stage,
+              status: status.status
+            });
+          }
+        }
+      );
+      
+      // Generation completed successfully
+      if (result.documentation && onGenerationComplete) {
+        onGenerationComplete(result.documentation);
       }
+      
     } catch (err) {
       console.error('Error generating documentation:', err);
       setError(err.message || 'Failed to generate documentation');
@@ -43,6 +66,8 @@ const DocumentationGenerator = ({
       if (onGenerationError) {
         onGenerationError(err);
       }
+    } finally {
+      setGenerationStatus(null);
     }
   };
 
@@ -51,6 +76,35 @@ const DocumentationGenerator = ({
       ...prev,
       [key]: value
     }));
+  };
+
+  const formatStageName = (stage) => {
+    if (!stage) return '';
+    
+    const stageMap = {
+      'initializing': 'Initializing...',
+      'analyzing_repository': 'Analyzing repository structure...',
+      'analyzing_functions_and_classes': 'Analyzing functions and classes...',
+      'generating_function_descriptions': 'Generating function descriptions...',
+      'generating_class_descriptions': 'Generating class descriptions...',
+      'generating_overview': 'Generating overview...',
+      'generating_architecture_analysis': 'Generating architecture analysis...',
+      'generating_user_guide': 'Generating user guide...',
+      'finalizing_documentation': 'Finalizing documentation...',
+      'completed': 'Documentation generated successfully!'
+    };
+    
+    if (stage.startsWith('analyzing_function_')) {
+      const funcName = stage.replace('analyzing_function_', '');
+      return `Analyzing function: ${funcName}`;
+    }
+    
+    if (stage.startsWith('analyzing_class_')) {
+      const className = stage.replace('analyzing_class_', '');
+      return `Analyzing class: ${className}`;
+    }
+    
+    return stageMap[stage] || stage;
   };
 
   return (
@@ -179,25 +233,37 @@ const DocumentationGenerator = ({
       )}
 
       {/* Generation progress */}
-      {isGenerating && (
+      {(isGenerating || generationStatus) && (
         <div className="px-6 py-4">
           <div className="flex items-center mb-2">
-            <RefreshCw className="w-5 h-5 text-primary-500 animate-spin mr-2" />
+            {generationStatus?.status === 'completed' ? (
+              <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+            ) : (
+              <RefreshCw className="w-5 h-5 text-primary-500 animate-spin mr-2" />
+            )}
             <span className="text-sm font-medium text-gray-700">
-              Generating documentation...
+              {generationStatus?.status === 'completed' 
+                ? 'Documentation generated successfully!'
+                : formatStageName(generationStatus?.current_stage || 'Generating documentation...')
+              }
             </span>
             <span className="ml-auto text-sm text-gray-500">
-              {Math.round(generationProgress)}%
+              {Math.round(generationStatus?.progress || generationProgress)}%
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
             <div 
-              className="bg-primary-500 h-2.5 rounded-full" 
-              style={{ width: `${generationProgress}%` }}
+              className={`h-2.5 rounded-full transition-all duration-300 ease-out ${
+                generationStatus?.status === 'completed' ? 'bg-green-500' : 'bg-primary-500'
+              }`}
+              style={{ width: `${generationStatus?.progress || generationProgress}%` }}
             ></div>
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            This may take a few minutes depending on repository size
+            {generationStatus?.status === 'completed'
+              ? 'Documentation has been generated and is ready to view.'
+              : 'AI is analyzing your code and generating comprehensive documentation. This may take a few minutes.'
+            }
           </p>
         </div>
       )}
@@ -206,14 +272,14 @@ const DocumentationGenerator = ({
       <div className="px-6 py-4 flex justify-end">
         <button
           onClick={handleGenerateDocumentation}
-          disabled={isGenerating || !repository}
+          disabled={isGenerating || !repository || generationStatus?.status === 'processing'}
           className={`flex items-center px-4 py-2 rounded-lg text-white ${
-            isGenerating || !repository
+            isGenerating || !repository || generationStatus?.status === 'processing'
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-primary-600 hover:bg-primary-700'
           }`}
         >
-          {isGenerating ? (
+          {isGenerating || generationStatus?.status === 'processing' ? (
             <>
               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
               Generating...

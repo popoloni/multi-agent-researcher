@@ -389,7 +389,7 @@ class RepositoryService:
         repo_path = Path(repository.local_path)
         
         # Define file extensions to analyze
-        code_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cs', '.go'}
+        code_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cs', '.go', '.r', '.R', '.ipynb'}
         
         # Walk through repository
         for file_path in repo_path.rglob('*'):
@@ -460,6 +460,9 @@ class RepositoryService:
             '.java': LanguageType.JAVA,
             '.cs': LanguageType.CSHARP,
             '.go': LanguageType.GO,
+            '.r': LanguageType.R,
+            '.R': LanguageType.R,
+            '.ipynb': LanguageType.JUPYTER,
         }
         
         primary_language = LanguageType.UNKNOWN
@@ -512,7 +515,7 @@ class RepositoryService:
         line_count = 0
         size_bytes = 0
         
-        code_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cs', '.go'}
+        code_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cs', '.go', '.r', '.R', '.ipynb'}
         
         for file_path in repo_path.rglob('*'):
             if file_path.is_file() and file_path.suffix in code_extensions:

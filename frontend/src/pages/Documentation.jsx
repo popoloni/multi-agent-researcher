@@ -32,6 +32,7 @@ const Documentation = () => {
   const [documentation, setDocumentation] = useState({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStage, setGenerationStage] = useState('');
   const [docStatus, setDocStatus] = useState('not_generated');
   const [lastGenerated, setLastGenerated] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,12 +49,13 @@ const Documentation = () => {
 
   // Update URL when doc type changes
   useEffect(() => {
-    if (selectedDocType) {
+    // Only update URL if docType actually changed and is different from current URL param
+    if (selectedDocType && selectedDocType !== docTypeParam) {
       const newParams = new URLSearchParams(location.search);
       newParams.set('type', selectedDocType);
       navigate(`${location.pathname}?${newParams.toString()}`, { replace: true });
     }
-  }, [selectedDocType, navigate, location]);
+  }, [selectedDocType]); // Only depend on selectedDocType
 
   // Load repository details
   const loadRepositoryDetails = async () => {
@@ -83,10 +85,12 @@ const Documentation = () => {
         setLastGenerated(response.data.last_generated || new Date().toISOString());
       } else {
         setDocStatus('not_generated');
+        setDocumentation({});
       }
     } catch (err) {
       console.error('Error loading documentation:', err);
       setDocStatus('not_generated');
+      setDocumentation({});
     }
   };
 
@@ -101,50 +105,114 @@ const Documentation = () => {
     }
   };
 
-  // Generate documentation
-  const handleGenerateDocumentation = async (options) => {
+  // Handle async documentation generation
+  const handleGenerateDocumentation = async (options = {}) => {
     if (!repository || !repository.id) return;
     
     setIsGenerating(true);
     setDocStatus('generating');
     setGenerationProgress(0);
+    setGenerationStage('Initializing...');
     
     try {
-      // Start progress simulation
-      const progressInterval = setInterval(() => {
-        setGenerationProgress(prev => {
-          const newProgress = prev + (100 - prev) * 0.05;
-          return newProgress > 95 ? 95 : newProgress;
-        });
-      }, 1000);
-      
-      // Generate documentation
+      // Start async documentation generation
       const response = await documentationService.generateDocumentation(repository.id, {
         branch: selectedBranch,
         ...options
       });
       
-      clearInterval(progressInterval);
-      setGenerationProgress(100);
+      const taskId = response.data.task_id;
       
-      // Update documentation state
-      if (response.data && response.data.documentation) {
-        setDocumentation(response.data.documentation);
+      // Poll for progress updates
+      const result = await documentationService.pollDocumentationStatus(
+        repository.id,
+        taskId,
+        (status) => {
+          setGenerationProgress(status.progress || 0);
+          setGenerationStage(formatStageName(status.current_stage || ''));
+        }
+      );
+      
+      // Generation completed successfully
+      if (result.documentation) {
+        setDocumentation(result.documentation);
         setDocStatus('generated');
         setLastGenerated(new Date().toISOString());
+        
+        // Reload functionalities
+        await loadFunctionalities();
       }
       
-      // Reload functionalities
-      await loadFunctionalities();
     } catch (error) {
       console.error('Error generating documentation:', error);
       setDocStatus('failed');
     } finally {
       setIsGenerating(false);
+      setGenerationProgress(0);
+      setGenerationStage('');
     }
   };
 
-  // Convert API reference object to markdown
+  // Format stage names for better UX
+  const formatStageName = (stage) => {
+    if (!stage) return 'Processing...';
+    
+    const stageMap = {
+      'initializing': 'Initializing...',
+      'analyzing_repository': 'Analyzing repository structure...',
+      'analyzing_functions_and_classes': 'Analyzing functions and classes...',
+      'generating_function_descriptions': 'Generating function descriptions...',
+      'generating_class_descriptions': 'Generating class descriptions...',
+      'generating_overview': 'Generating overview...',
+      'generating_architecture_analysis': 'Generating architecture analysis...',
+      'generating_user_guide': 'Generating user guide...',
+      'finalizing_documentation': 'Finalizing documentation...',
+      'completed': 'Documentation generated successfully!'
+    };
+    
+    if (stage.startsWith('analyzing_function_')) {
+      const funcName = stage.replace('analyzing_function_', '');
+      return `Analyzing function: ${funcName}`;
+    }
+    
+    if (stage.startsWith('analyzing_class_')) {
+      const className = stage.replace('analyzing_class_', '');
+      return `Analyzing class: ${className}`;
+    }
+    
+    return stageMap[stage] || stage;
+  };
+
+  // Get documentation content for selected type
+  const getDocumentationContent = () => {
+    if (!documentation || Object.keys(documentation).length === 0) {
+      return '';
+    }
+
+    // Map frontend doc types to backend doc types
+    const docTypeMapping = {
+      'overview': 'overview',
+      'api': 'api_reference', 
+      'architecture': 'architecture',
+      'usage': 'user_guide'
+    };
+
+    const backendDocType = docTypeMapping[selectedDocType];
+    
+    if (!backendDocType) {
+      return '';
+    }
+
+    // Handle api_reference which is an object
+    if (backendDocType === 'api_reference' && documentation.api_reference) {
+      return convertApiReferenceToMarkdown(documentation.api_reference);
+    }
+
+    // Return the content directly (already markdown)
+    return documentation[backendDocType] || '';
+  };
+
+  // Convert API reference object to markdown (for backward compatibility)
   const convertApiReferenceToMarkdown = (apiRef) => {
     if (!apiRef || typeof apiRef !== 'object') return '';
 
@@ -162,7 +230,7 @@ const Documentation = () => {
           markdown += `**Location:** \`${func.file}:${func.line}\`\n\n`;
         }
         if (func.code_snippet) {
-          markdown += '```python\n' + func.code_snippet + '\n```\n\n';
+          markdown += '```\n' + func.code_snippet + '\n```\n\n';
         }
         markdown += '---\n\n';
       });
@@ -180,59 +248,11 @@ const Documentation = () => {
           markdown += `**Location:** \`${cls.file}:${cls.line}\`\n\n`;
         }
         if (cls.code_snippet) {
-          markdown += '```python\n' + cls.code_snippet + '\n```\n\n';
+          markdown += '```\n' + cls.code_snippet + '\n```\n\n';
         }
         markdown += '---\n\n';
       });
     }
-
-    return markdown;
-  };
-
-  // Convert architecture object to markdown
-  const convertArchitectureToMarkdown = (arch) => {
-    if (!arch || typeof arch !== 'object') return '';
-
-    let markdown = '# Architecture Documentation\n\n';
-
-    // Overview
-    markdown += '## Repository Architecture Overview\n\n';
-
-    if (arch.language) {
-      markdown += `**Primary Language:** ${arch.language}\n\n`;
-    }
-
-    if (arch.total_files) {
-      markdown += `**Total Files:** ${arch.total_files}\n\n`;
-    }
-
-    if (arch.total_elements) {
-      markdown += `**Total Code Elements:** ${arch.total_elements}\n\n`;
-    }
-
-    // Element breakdown
-    if (arch.element_counts) {
-      markdown += '## Code Element Distribution\n\n';
-      Object.entries(arch.element_counts).forEach(([type, count]) => {
-        markdown += `- **${type.charAt(0).toUpperCase() + type.slice(1)}s:** ${count}\n`;
-      });
-      markdown += '\n';
-    }
-
-    // Frameworks detected
-    if (arch.frameworks_detected && arch.frameworks_detected.length > 0) {
-      markdown += '## Detected Frameworks\n\n';
-      arch.frameworks_detected.forEach(framework => {
-        markdown += `- ${framework}\n`;
-      });
-      markdown += '\n';
-    }
-
-    // Architecture insights
-    markdown += '## Architecture Analysis\n\n';
-    markdown += 'This repository follows a structured approach with well-organized code elements. ';
-    markdown += `The codebase contains ${arch.total_elements || 0} total elements across ${arch.total_files || 0} files, `;
-    markdown += `indicating a ${arch.total_elements > 500 ? 'large-scale' : 'medium-scale'} project.\n\n`;
 
     return markdown;
   };
@@ -325,7 +345,14 @@ const Documentation = () => {
         />
         
         {/* Documentation Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={(value) => {
+          if (value === 'functionalities') {
+            // Navigate to the original functionalities page instead of using embedded tab
+            navigate(`/repositories/${repository.id}/functionalities`);
+          } else {
+            setActiveTab(value);
+          }
+        }}>
           <TabsList className="mb-4">
             <TabsTrigger value="view">View Documentation</TabsTrigger>
             <TabsTrigger value="search">Search</TabsTrigger>
@@ -335,22 +362,16 @@ const Documentation = () => {
           
           <TabsContent value="view">
             <DocumentationViewer 
-              content={
-                selectedDocType === 'api' ?
-                  convertApiReferenceToMarkdown(documentation['api_reference']) :
-                selectedDocType === 'architecture' ?
-                  convertArchitectureToMarkdown(documentation['architecture']) :
-                  documentation[selectedDocType] || ''
-              }
+              content={getDocumentationContent()}
               title={
                 selectedDocType === 'overview' ? 'Repository Overview' :
-                selectedDocType === 'api' ? 'API Documentation' :
+                selectedDocType === 'api' ? 'API Reference' :
                 selectedDocType === 'architecture' ? 'Architecture Documentation' :
-                selectedDocType === 'usage' ? 'Usage Guide' :
+                selectedDocType === 'usage' ? 'User Guide' :
                 'Documentation'
               }
               docType={selectedDocType}
-              isLoading={isLoading}
+              isLoading={isGenerating}
               onSearch={handleSearch}
             />
           </TabsContent>
@@ -363,32 +384,34 @@ const Documentation = () => {
             />
           </TabsContent>
           
-          <TabsContent value="functionalities">
-            <FunctionalitiesRegistry
-              repository={repository}
-              branch={selectedBranch}
-              apiEndpoints={apiEndpoints}
-              onGenerateDocumentation={() => handleGenerateDocumentation({})}
-              onBranchChange={setSelectedBranch}
-            />
-          </TabsContent>
-          
           <TabsContent value="generate">
             <DocumentationGenerator 
               repository={repository}
-              onGenerationStart={() => {
+              onGenerationStart={(progressInfo) => {
                 setIsGenerating(true);
                 setDocStatus('generating');
+                if (progressInfo) {
+                  setGenerationProgress(progressInfo.progress || 0);
+                  setGenerationStage(progressInfo.stage || '');
+                }
               }}
-              onGenerationComplete={(data) => {
-                setDocumentation(data.documentation || {});
+              onGenerationComplete={(documentation) => {
+                setDocumentation(documentation || {});
                 setDocStatus('generated');
                 setLastGenerated(new Date().toISOString());
                 setIsGenerating(false);
+                setGenerationProgress(0);
+                setGenerationStage('');
+                
+                // Reload functionalities
+                loadFunctionalities();
               }}
-              onGenerationError={() => {
+              onGenerationError={(error) => {
                 setDocStatus('failed');
                 setIsGenerating(false);
+                setGenerationProgress(0);
+                setGenerationStage('');
+                console.error('Documentation generation failed:', error);
               }}
               isGenerating={isGenerating}
               generationProgress={generationProgress}

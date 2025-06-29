@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FileText, GitBranch, Calendar, Code, Hash, ExternalLink } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import { repositoryService } from '../services/repositories';
+import { repositoryService, cleanRepositoryPath } from '../services/repositories';
 
 const RepositoryDetails = () => {
   const { repositoryId } = useParams();
@@ -175,7 +175,7 @@ const RepositoryDetails = () => {
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-600">Local Path</dt>
-                <dd className="mt-1 text-sm text-gray-900 font-mono">{repository.local_path}</dd>
+                <dd className="mt-1 text-sm text-gray-900 font-mono">{cleanRepositoryPath(repository.local_path)}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-600">Language</dt>

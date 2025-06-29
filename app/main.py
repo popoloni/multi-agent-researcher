@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from typing import Dict, Any, List
-from uuid import UUID
+from uuid import UUID, uuid4
 import asyncio
 from datetime import datetime
 
@@ -21,7 +21,7 @@ from app.models.repository_schemas import (
 )
 from app.services.indexing_service import SearchFilters
 from app.services.research_service import ResearchService
-from app.services.github_service import github_service
+from app.services.github_service import github_service, GitHubService
 from app.core.config import settings
 
 # Initialize FastAPI app
@@ -52,6 +52,9 @@ kenobi_agent = KenobiAgent()
 # In-memory storage for generated documentation
 # In production, this should be replaced with a proper database
 documentation_storage = {}
+
+# Add storage for documentation generation tasks
+documentation_generation_storage = {}
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -471,6 +474,7 @@ async def index_repository(repo_request: RepositoryIndexRequest):
     """
     try:
         local_path = repo_request.path
+        repository = None
         
         # Check if this is a GitHub URL that needs to be cloned first
         if repo_request.path.startswith(('https://github.com/', 'http://github.com/', 'git@github.com:')):
@@ -483,20 +487,49 @@ async def index_repository(repo_request: RepositoryIndexRequest):
                 raise HTTPException(status_code=400, detail="Invalid GitHub URL format")
             
             owner, repo_name = match.groups()
+            repository_name = repo_request.name or repo_name
+            
+            # Check if repository already exists by name
+            existing_repos = await kenobi_agent.repository_service.list_repositories()
+            for existing_repo in existing_repos:
+                if existing_repo.name == repository_name:
+                    # Return existing repository instead of creating duplicate
+                    analysis = await kenobi_agent.repository_service.analyze_repository(existing_repo.id)
+                    return JSONResponse(content={
+                        "status": "success",
+                        "repository_id": existing_repo.id,
+                        "repository_name": existing_repo.name,
+                        "language": existing_repo.language.value,
+                        "framework": existing_repo.framework,
+                        "message": "Repository already exists",
+                        "files_analyzed": len(analysis.files) if analysis else 0,
+                        "elements_extracted": sum(len(f.elements) for f in analysis.files) if analysis else 0
+                    })
+            
+            # Get repository info to get the correct default branch
+            try:
+                repo_info = await github_service.get_repository_info(owner, repo_name)
+                default_branch = repo_info.get('default_branch', 'main')
+            except Exception:
+                # Fallback to main if GitHub API call fails
+                default_branch = 'main'
             
             # Clone the repository first
             repository = await kenobi_agent.repository_service.clone_github_repository(
                 owner=owner,
                 repo=repo_name,
-                branch="main",  # Default branch
-                local_name=repo_request.name or repo_name
+                branch=default_branch,  # Use actual default branch
+                local_name=repository_name
             )
             
             # Use the local path from the cloned repository
             local_path = repository.local_path
-        
-        # Analyze the repository
-        analysis = await kenobi_agent.analyze_repository(local_path)
+            
+            # Use the repository created by cloning, don't analyze again
+            analysis = await kenobi_agent.repository_service.analyze_repository(repository.id)
+        else:
+            # Analyze the repository from local path
+            analysis = await kenobi_agent.analyze_repository(local_path)
         
         response_data = {
             "status": "success",
@@ -692,6 +725,38 @@ async def get_repository_details(repository_id: str) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Repository details retrieval failed: {str(e)}")
 
+@app.delete("/kenobi/repositories/{repository_id}")
+async def delete_repository(repository_id: str) -> Dict[str, Any]:
+    """
+    Delete a repository and all its associated data
+    """
+    try:
+        # Check if repository exists in the dictionary
+        if repository_id not in kenobi_agent.repository_service.repositories:
+            raise HTTPException(status_code=404, detail=f"Repository with ID {repository_id} not found")
+        
+        # Get repository info before deletion
+        repository = kenobi_agent.repository_service.repositories[repository_id]
+        
+        # Remove the repository from the service's dictionary
+        del kenobi_agent.repository_service.repositories[repository_id]
+        
+        # Also remove from analyses if it exists
+        if repository_id in kenobi_agent.repository_service.analyses:
+            del kenobi_agent.repository_service.analyses[repository_id]
+        
+        return {
+            "success": True,
+            "message": f"Repository '{repository.name}' ({repository_id}) deleted successfully",
+            "repository_id": repository_id,
+            "repository_name": repository.name
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete repository: {str(e)}")
+
 @app.get("/kenobi/repositories/{repository_id}/functionalities")
 async def get_repository_functionalities(repository_id: str, branch: str = "main") -> Dict[str, Any]:
     """
@@ -741,9 +806,9 @@ async def get_repository_functionalities(repository_id: str, branch: str = "main
         raise HTTPException(status_code=500, detail=f"Functionalities retrieval failed: {str(e)}")
 
 @app.post("/kenobi/repositories/{repository_id}/documentation")
-async def generate_documentation(repository_id: str, options: Dict[str, Any] = None) -> Dict[str, Any]:
+async def generate_documentation(repository_id: str, background_tasks: BackgroundTasks, options: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Generate documentation for a repository
+    Generate documentation for a repository (Async)
     
     Creates comprehensive documentation including API docs, code analysis,
     and architectural overview for the specified repository.
@@ -758,52 +823,368 @@ async def generate_documentation(repository_id: str, options: Dict[str, Any] = N
         repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
         if not repository:
             raise HTTPException(status_code=404, detail="Repository not found")
+
+        # Generate unique task ID
+        task_id = str(uuid4())
         
-        # Get repository analysis
-        analysis = await kenobi_agent.repository_service.analyze_repository(repository_id)
-        
-        # Count elements by type
-        element_counts = {}
-        all_elements = []
-        for file in analysis.files:
-            for element in file.elements:
-                element_type = element.element_type.value
-                element_counts[element_type] = element_counts.get(element_type, 0) + 1
-                all_elements.append(element)
-        
-        # Generate documentation using the research agent
-        documentation_prompt = f"""
-        Generate comprehensive documentation for the repository with the following analysis:
-        
-        Repository: {analysis.repository.name}
-        Language: {analysis.repository.language.value}
-        Total Files: {len(analysis.files)}
-        Total Elements: {len(all_elements)}
-        Element Types: {element_counts}
-        
-        Please create documentation that includes:
-        1. Overview and purpose
-        2. Installation and setup instructions
-        3. API reference for key functions and classes
-        4. Usage examples
-        5. Architecture overview
-        
-        Focus on the most important functions and classes for users.
-        """
-        
-        # For now, let's create documentation directly without the research service
-        # to avoid complexity and demonstrate the functionality
-        
-        # Get functions and classes for API reference
-        functions = [elem for elem in all_elements if elem.element_type.value == "function"][:20]
-        classes = [elem for elem in all_elements if elem.element_type.value == "class"][:10]
-        
-        # Generate a comprehensive overview
-        overview = f"""
-# {analysis.repository.name} Documentation
+        # Initialize task status
+        documentation_generation_storage[task_id] = {
+            "status": "processing",
+            "progress": 0,
+            "current_stage": "initializing",
+            "repository_id": repository_id,
+            "branch": branch,
+            "started_at": datetime.now().isoformat(),
+            "documentation": None,
+            "error": None
+        }
+
+        # Start background task
+        async def generate_documentation_async():
+            try:
+                # Update progress: Starting analysis
+                documentation_generation_storage[task_id].update({
+                    "progress": 10,
+                    "current_stage": "analyzing_repository"
+                })
+
+                # Get repository analysis
+                analysis = await kenobi_agent.repository_service.analyze_repository(repository_id)
+                
+                # Count elements by type
+                element_counts = {}
+                all_elements = []
+                for file in analysis.files:
+                    for element in file.elements:
+                        element_type = element.element_type.value
+                        element_counts[element_type] = element_counts.get(element_type, 0) + 1
+                        all_elements.append(element)
+
+                # Update progress: Analyzing functions and classes
+                documentation_generation_storage[task_id].update({
+                    "progress": 20,
+                    "current_stage": "analyzing_functions_and_classes"
+                })
+
+                # Get functions and classes for detailed analysis
+                functions = [elem for elem in all_elements if elem.element_type.value == "function"][:20]
+                classes = [elem for elem in all_elements if elem.element_type.value == "class"][:10]
+                
+                # Update progress: Generating function descriptions
+                documentation_generation_storage[task_id].update({
+                    "progress": 30,
+                    "current_stage": "generating_function_descriptions"
+                })
+
+                # Generate AI-powered descriptions for functions
+                functions_with_descriptions = []
+                for i, func in enumerate(functions):
+                    try:
+                        # Update progress for each function
+                        func_progress = 30 + (i / len(functions)) * 15  # 30-45%
+                        documentation_generation_storage[task_id].update({
+                            "progress": int(func_progress),
+                            "current_stage": f"analyzing_function_{func.name}"
+                        })
+
+                        # Use Ollama to generate function description
+                        description_prompt = f"""Analyze this {analysis.repository.language.value} function and provide a concise, helpful description of what it does:
+
+Function Name: {func.name}
+File: {func.file_path}
+Code:
+{func.code_snippet}
+
+Provide a 1-2 sentence description of what this function does, its purpose, and key parameters if visible."""
+                        
+                        # Call Ollama for description
+                        import httpx
+                        async with httpx.AsyncClient() as client:
+                            ollama_response = await client.post(
+                                "http://localhost:11434/api/generate",
+                                json={
+                                    "model": "llama3.2:1b",
+                                    "prompt": description_prompt,
+                                    "stream": False
+                                },
+                                timeout=30.0
+                            )
+                            
+                            if ollama_response.status_code == 200:
+                                response_data = ollama_response.json()
+                                ai_description = response_data.get("response", "").strip()
+                                # Clean up the response
+                                if ai_description and len(ai_description) > 10:
+                                    functions_with_descriptions.append({
+                                        "name": func.name,
+                                        "description": ai_description,
+                                        "file": func.file_path,
+                                        "line": func.start_line,
+                                        "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
+                                    })
+                                    continue
+                            
+                        # Fallback if AI fails
+                        functions_with_descriptions.append({
+                            "name": func.name,
+                            "description": f"Function {func.name} defined in {func.file_path}",
+                            "file": func.file_path,
+                            "line": func.start_line,
+                            "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
+                        })
+                            
+                    except Exception as e:
+                        # Fallback description if AI generation fails
+                        functions_with_descriptions.append({
+                            "name": func.name,
+                            "description": f"Function {func.name} defined in {func.file_path}",
+                            "file": func.file_path,
+                            "line": func.start_line,
+                            "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
+                        })
+
+                # Update progress: Generating class descriptions
+                documentation_generation_storage[task_id].update({
+                    "progress": 45,
+                    "current_stage": "generating_class_descriptions"
+                })
+
+                # Generate AI-powered descriptions for classes
+                classes_with_descriptions = []
+                for i, cls in enumerate(classes):
+                    try:
+                        # Update progress for each class
+                        class_progress = 45 + (i / max(len(classes), 1)) * 10  # 45-55%
+                        documentation_generation_storage[task_id].update({
+                            "progress": int(class_progress),
+                            "current_stage": f"analyzing_class_{cls.name}"
+                        })
+
+                        # Use Ollama to generate class description
+                        description_prompt = f"""Analyze this {analysis.repository.language.value} class/structure and provide a concise description:
+
+Class Name: {cls.name}
+File: {cls.file_path}
+Code:
+{cls.code_snippet}
+
+Provide a 1-2 sentence description of what this class represents and its main purpose."""
+                        
+                        # Call Ollama for description
+                        import httpx
+                        async with httpx.AsyncClient() as client:
+                            ollama_response = await client.post(
+                                "http://localhost:11434/api/generate",
+                                json={
+                                    "model": "llama3.2:1b",
+                                    "prompt": description_prompt,
+                                    "stream": False
+                                },
+                                timeout=30.0
+                            )
+                            
+                            if ollama_response.status_code == 200:
+                                response_data = ollama_response.json()
+                                ai_description = response_data.get("response", "").strip()
+                                if ai_description and len(ai_description) > 10:
+                                    classes_with_descriptions.append({
+                                        "name": cls.name,
+                                        "description": ai_description,
+                                        "file": cls.file_path,
+                                        "line": cls.start_line,
+                                        "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
+                                    })
+                                    continue
+                            
+                        # Fallback if AI fails
+                        classes_with_descriptions.append({
+                            "name": cls.name,
+                            "description": f"Class/structure {cls.name} defined in {cls.file_path}",
+                            "file": cls.file_path,
+                            "line": cls.start_line,
+                            "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
+                        })
+                            
+                    except Exception as e:
+                        # Fallback description
+                        classes_with_descriptions.append({
+                            "name": cls.name,
+                            "description": f"Class/structure {cls.name} defined in {cls.file_path}",
+                            "file": cls.file_path,
+                            "line": cls.start_line,
+                            "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
+                        })
+
+                # Update progress: Generating overview
+                documentation_generation_storage[task_id].update({
+                    "progress": 55,
+                    "current_stage": "generating_overview"
+                })
+
+                # Generate comprehensive overview using AI
+                overview_prompt = f"""Generate comprehensive documentation for this {analysis.repository.language.value} repository:
+
+Repository: {analysis.repository.name}
+Language: {analysis.repository.language.value}
+Total Files: {len(analysis.files)}
+Total Elements: {len(all_elements)}
+Functions: {element_counts.get('function', 0)}
+Classes: {element_counts.get('class', 0)}
+Variables: {element_counts.get('variable', 0)}
+
+Key Functions:
+{chr(10).join([f"- {f['name']}: {f['description'][:80]}..." for f in functions_with_descriptions[:5]])}
+
+Generate a comprehensive overview including:
+1. What this repository does
+2. Key components and architecture
+3. Installation/setup instructions
+4. Basic usage guidance
+
+Make it professional and informative."""
+
+                # Generate AI overview
+                try:
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        # Generate overview
+                        ollama_response = await client.post(
+                            "http://localhost:11434/api/generate",
+                            json={
+                                "model": "llama3.2:1b",
+                                "prompt": overview_prompt,
+                                "stream": False
+                            },
+                            timeout=45.0
+                        )
+                        
+                        if ollama_response.status_code == 200:
+                            response_data = ollama_response.json()
+                            ai_overview = response_data.get("response", "").strip()
+                        else:
+                            ai_overview = ""
+
+                except Exception as e:
+                    ai_overview = ""
+
+                # Update progress: Generating architecture analysis
+                documentation_generation_storage[task_id].update({
+                    "progress": 70,
+                    "current_stage": "generating_architecture_analysis"
+                })
+
+                # Generate detailed architecture analysis using AI
+                architecture_prompt = f"""Analyze the architecture of this {analysis.repository.language.value} repository and provide a comprehensive architectural overview:
+
+Repository: {analysis.repository.name}
+Language: {analysis.repository.language.value}
+Total Files: {len(analysis.files)}
+File Structure: {[f.file_path for f in analysis.files]}
+Functions: {element_counts.get('function', 0)}
+Classes: {element_counts.get('class', 0)}
+Methods: {element_counts.get('method', 0)}
+Variables: {element_counts.get('variable', 0)}
+
+Key Components:
+{chr(10).join([f"- {f['name']} ({f['file']})" for f in functions_with_descriptions[:8]])}
+
+Create a detailed architecture analysis covering:
+1. **Overall Design Pattern** - What architectural pattern does this follow?
+2. **Module Organization** - How are files and modules organized?
+3. **Key Components** - What are the main architectural components?
+4. **Data Flow** - How does data flow through the system?
+5. **Dependencies** - What are the main dependencies and relationships?
+6. **Design Principles** - What design principles are evident?
+7. **Extensibility** - How can this architecture be extended?
+
+Provide specific insights about the codebase structure and architectural decisions."""
+
+                # Generate AI architecture analysis
+                try:
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        ollama_response = await client.post(
+                            "http://localhost:11434/api/generate",
+                            json={
+                                "model": "llama3.2:1b",
+                                "prompt": architecture_prompt,
+                                "stream": False
+                            },
+                            timeout=60.0
+                        )
+                        
+                        if ollama_response.status_code == 200:
+                            response_data = ollama_response.json()
+                            ai_architecture = response_data.get("response", "").strip()
+                        else:
+                            ai_architecture = ""
+                except Exception as e:
+                    ai_architecture = ""
+
+                # Update progress: Generating user guide
+                documentation_generation_storage[task_id].update({
+                    "progress": 85,
+                    "current_stage": "generating_user_guide"
+                })
+
+                # Generate comprehensive user guide using AI
+                user_guide_prompt = f"""Create a comprehensive user guide for this {analysis.repository.language.value} repository:
+
+Repository: {analysis.repository.name}
+Language: {analysis.repository.language.value}
+Total Files: {len(analysis.files)}
+
+Key Functions Available:
+{chr(10).join([f"- {f['name']}: {f['description'][:100]}..." for f in functions_with_descriptions[:10]])}
+
+Key Classes Available:
+{chr(10).join([f"- {c['name']}: {c['description'][:100]}..." for c in classes_with_descriptions[:5]])}
+
+Create a detailed user guide that includes:
+1. **Getting Started** - Step-by-step setup and installation
+2. **Basic Usage** - How to use the main functionality with examples
+3. **Advanced Features** - More complex usage patterns and features
+4. **Common Use Cases** - Typical scenarios and how to handle them
+5. **Configuration** - How to configure and customize the behavior
+6. **Troubleshooting** - Common issues and solutions
+7. **Examples** - Practical code examples showing real usage
+
+Make it practical and actionable for users who want to actually use this repository."""
+
+                # Generate AI user guide
+                try:
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        ollama_response = await client.post(
+                            "http://localhost:11434/api/generate",
+                            json={
+                                "model": "llama3.2:1b",
+                                "prompt": user_guide_prompt,
+                                "stream": False
+                            },
+                            timeout=60.0
+                        )
+                        
+                        if ollama_response.status_code == 200:
+                            response_data = ollama_response.json()
+                            ai_user_guide = response_data.get("response", "").strip()
+                        else:
+                            ai_user_guide = ""
+                except Exception as e:
+                    ai_user_guide = ""
+
+                # Update progress: Finalizing documentation
+                documentation_generation_storage[task_id].update({
+                    "progress": 95,
+                    "current_stage": "finalizing_documentation"
+                })
+                
+                # Fallback content if AI fails
+                if not ai_overview or len(ai_overview) < 50:
+                    ai_overview = f"""# {analysis.repository.name} Documentation
 
 ## Overview
-This is a {analysis.repository.language.value} repository with {len(analysis.files)} files and {len(all_elements)} code elements.
+This is a {analysis.repository.language.value} repository with {len(analysis.files)} files and {len(all_elements)} code elements. The repository contains {element_counts.get('function', 0)} functions, {element_counts.get('class', 0)} classes, and {element_counts.get('variable', 0)} variables.
 
 ## Key Statistics
 - **Language**: {analysis.repository.language.value}
@@ -811,10 +1192,6 @@ This is a {analysis.repository.language.value} repository with {len(analysis.fil
 - **Total Functions**: {element_counts.get('function', 0)}
 - **Total Classes**: {element_counts.get('class', 0)}
 - **Total Variables**: {element_counts.get('variable', 0)}
-
-## Architecture
-The repository contains the following types of code elements:
-{chr(10).join([f"- **{k.title()}s**: {v}" for k, v in element_counts.items()])}
 
 ## Installation
 ```bash
@@ -824,68 +1201,151 @@ cd {analysis.repository.name}
 ```
 
 ## Usage
-This repository provides various functionalities organized across {len(analysis.files)} files.
-Key components include the main functions and classes listed in the API reference below.
-"""
-        
-        # Structure the documentation
-        documentation = {
-            "overview": overview.strip(),
-            "api_reference": {
-                "functions": [
-                    {
-                        "name": func.name,
-                        "description": func.description or "No description available",
-                        "file": func.file_path,
-                        "line": func.start_line,
-                        "code_snippet": func.code_snippet[:100] + "..." if len(func.code_snippet) > 100 else func.code_snippet
+This repository provides various functionalities organized across {len(analysis.files)} files. Key components include the main functions and classes listed in the API reference below."""
+
+                if not ai_architecture or len(ai_architecture) < 50:
+                    ai_architecture = f"""# Architecture Documentation
+
+## Repository Architecture Overview
+
+### Design Pattern
+This {analysis.repository.language.value} repository follows a structured approach with well-organized code elements.
+
+### File Organization
+The codebase contains {len(analysis.files)} files:
+{chr(10).join([f"- {f.file_path}" for f in analysis.files])}
+
+### Code Elements Distribution
+- **Functions**: {element_counts.get('function', 0)}
+- **Classes**: {element_counts.get('class', 0)}
+- **Methods**: {element_counts.get('method', 0)}
+- **Variables**: {element_counts.get('variable', 0)}
+
+### Key Components
+The repository is organized around {element_counts.get('function', 0)} functions and {element_counts.get('class', 0)} classes that provide the core functionality.
+
+### Design Principles
+The codebase demonstrates {len(all_elements)} total elements across {len(analysis.files)} files, indicating a {'large-scale' if len(all_elements) > 100 else 'moderate-scale'} project with {'good' if len(all_elements) / len(analysis.files) < 100 else 'complex'} organization."""
+
+                if not ai_user_guide or len(ai_user_guide) < 50:
+                    ai_user_guide = f"""# User Guide
+
+## Getting Started
+
+### Installation
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd {analysis.repository.name}
+```
+
+2. Install dependencies:
+```bash
+# Follow {analysis.repository.language.value}-specific installation instructions
+```
+
+### Basic Usage
+
+This repository provides {element_counts.get('function', 0)} functions and {element_counts.get('class', 0)} classes for various operations.
+
+#### Key Functions
+{chr(10).join([f"- **{f['name']}**: {f['description'][:80]}..." for f in functions_with_descriptions[:5]])}
+
+#### Key Classes
+{chr(10).join([f"- **{c['name']}**: {c['description'][:80]}..." for c in classes_with_descriptions[:3]])}
+
+### Common Use Cases
+
+Refer to the API Reference section for detailed information about each function and class.
+
+### Examples
+
+See the code snippets in the API Reference for usage examples."""
+                
+                # Structure the comprehensive documentation
+                documentation = {
+                    "overview": ai_overview,
+                    "api_reference": {
+                        "functions": functions_with_descriptions,
+                        "classes": classes_with_descriptions
+                    },
+                    "architecture": ai_architecture,
+                    "user_guide": ai_user_guide,
+                    "stats": {
+                        "total_files": len(analysis.files),
+                        "total_elements": len(all_elements),
+                        "element_counts": element_counts,
+                        "language": analysis.repository.language.value,
+                        "frameworks_detected": analysis.frameworks_detected
                     }
-                    for func in functions
-                ],
-                "classes": [
-                    {
-                        "name": cls.name,
-                        "description": cls.description or "No description available",
-                        "file": cls.file_path,
-                        "line": cls.start_line,
-                        "code_snippet": cls.code_snippet[:100] + "..." if len(cls.code_snippet) > 100 else cls.code_snippet
-                    }
-                    for cls in classes
-                ]
-            },
-            "architecture": {
-                "total_files": len(analysis.files),
-                "total_elements": len(all_elements),
-                "element_counts": element_counts,
-                "language": analysis.repository.language.value,
-                "frameworks_detected": analysis.frameworks_detected
-            }
-        }
-        
-        # return {
-        #     "documentation": documentation,
-        #     "repository_id": repository_id,
-        #     "branch": branch,
-        #     "generated_at": datetime.now().isoformat(),
-        #     "status": "success"
-        # }
-        
-        # Store the generated documentation in memory
-        doc_key = f"{repository_id}:{branch}"
-        documentation_storage[doc_key] = {
-            "documentation": documentation,
+                }
+                
+                # Store the generated documentation in memory
+                doc_key = f"{repository_id}:{branch}"
+                documentation_storage[doc_key] = {
+                    "documentation": documentation,
+                    "repository_id": repository_id,
+                    "branch": branch,
+                    "generated_at": datetime.now().isoformat(),
+                    "status": "success"
+                }
+
+                # Mark task as completed
+                documentation_generation_storage[task_id].update({
+                    "status": "completed",
+                    "progress": 100,
+                    "current_stage": "completed",
+                    "documentation": documentation,
+                    "completed_at": datetime.now().isoformat()
+                })
+
+            except Exception as e:
+                # Mark task as failed
+                documentation_generation_storage[task_id].update({
+                    "status": "failed",
+                    "current_stage": "error",
+                    "error": str(e),
+                    "failed_at": datetime.now().isoformat()
+                })
+
+        # Start the background task
+        background_tasks.add_task(generate_documentation_async)
+
+        return {
+            "status": "processing",
+            "task_id": task_id,
             "repository_id": repository_id,
             "branch": branch,
-            "generated_at": datetime.now().isoformat(),
-            "status": "success"
+            "message": "Documentation generation started",
+            "progress": 0,
+            "current_stage": "initializing"
         }
-
-        return documentation_storage[doc_key]
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Documentation generation failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/documentation/status/{task_id}")
+async def get_documentation_generation_status(repository_id: str, task_id: str) -> Dict[str, Any]:
+    """
+    Get the status of documentation generation task
+    """
+    try:
+        if task_id not in documentation_generation_storage:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        task_info = documentation_generation_storage[task_id]
+        
+        if task_info["repository_id"] != repository_id:
+            raise HTTPException(status_code=404, detail="Task not found for this repository")
+        
+        return task_info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Status retrieval failed: {str(e)}")
 
 @app.get("/kenobi/repositories/{repository_id}/documentation")
 async def get_documentation(repository_id: str, branch: str = "main") -> Dict[str, Any]:

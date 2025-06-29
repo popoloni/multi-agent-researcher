@@ -24,6 +24,9 @@ class CodeParser:
             '.java': LanguageType.JAVA,
             '.cs': LanguageType.CSHARP,
             '.go': LanguageType.GO,
+            '.r': LanguageType.R,
+            '.R': LanguageType.R,
+            '.ipynb': LanguageType.JUPYTER,
         }
     
     def detect_language(self, file_path: str) -> LanguageType:
@@ -69,6 +72,10 @@ class CodeParser:
                 elements, imports = self._parse_java(file_path, content)
             elif language == LanguageType.GO:
                 elements, imports = self._parse_go(file_path, content)
+            elif language == LanguageType.R:
+                elements, imports = self._parse_r(file_path, content)
+            elif language == LanguageType.JUPYTER:
+                elements, imports = self._parse_jupyter(file_path, content)
             else:
                 # For unsupported languages, do basic text analysis
                 elements = self._parse_generic(file_path, content)
@@ -324,6 +331,105 @@ class CodeParser:
                 code_snippet=self._extract_snippet(content, match.start(), match.end())
             ))
         
+        return elements, imports
+    
+    def _parse_r(self, file_path: str, content: str) -> Tuple[List[CodeElement], List[ImportInfo]]:
+        """Parse R file using regex patterns"""
+        elements = []
+        imports = []
+        
+        # Extract library imports
+        import_patterns = [
+            r'library\s*\(\s*([^)]+)\s*\)',
+            r'require\s*\(\s*([^)]+)\s*\)',
+            r'source\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)'
+        ]
+        
+        for pattern in import_patterns:
+            for match in re.finditer(pattern, content):
+                module = match.group(1).strip('\'"')
+                imports.append(ImportInfo(
+                    module=module,
+                    alias=None,
+                    is_local=module.endswith('.R') or module.endswith('.r'),
+                    import_type="library"
+                ))
+        
+        # Extract function definitions
+        function_pattern = r'(\w+)\s*<-\s*function\s*\([^)]*\)'
+        for match in re.finditer(function_pattern, content):
+            name = match.group(1)
+            line_num = content[:match.start()].count('\n') + 1
+            elements.append(CodeElement(
+                id=f"{file_path}:{name}",
+                repository_id="",
+                file_path=file_path,
+                element_type=ElementType.FUNCTION,
+                name=name,
+                full_name=f"{file_path}:{name}",
+                start_line=line_num,
+                end_line=line_num,
+                code_snippet=self._extract_snippet(content, match.start(), match.end() + 50)
+            ))
+        
+        # Extract variable assignments (for major data objects)
+        variable_pattern = r'(\w+)\s*<-\s*(?!function)'
+        for match in re.finditer(variable_pattern, content):
+            name = match.group(1)
+            # Skip common temporary variables
+            if len(name) > 2 and name not in ['i', 'j', 'k', 'x', 'y', 'z', 'tmp', 'temp']:
+                line_num = content[:match.start()].count('\n') + 1
+                elements.append(CodeElement(
+                    id=f"{file_path}:{name}",
+                    repository_id="",
+                    file_path=file_path,
+                    element_type=ElementType.VARIABLE,
+                    name=name,
+                    full_name=f"{file_path}:{name}",
+                    start_line=line_num,
+                    end_line=line_num,
+                    code_snippet=self._extract_snippet(content, match.start(), match.end() + 30)
+                ))
+        
+        return elements, imports
+    
+    def _parse_jupyter(self, file_path: str, content: str) -> Tuple[List[CodeElement], List[ImportInfo]]:
+        """Parse Jupyter notebook file"""
+        import json
+        elements = []
+        imports = []
+        
+        try:
+            notebook = json.loads(content)
+            cells = notebook.get('cells', [])
+            
+            for i, cell in enumerate(cells):
+                if cell.get('cell_type') == 'code':
+                    cell_source = ''.join(cell.get('source', []))
+                    if cell_source.strip():
+                        # Parse each code cell as Python
+                        try:
+                            cell_elements, cell_imports = self._parse_python(f"{file_path}:cell_{i}", cell_source)
+                            elements.extend(cell_elements)
+                            imports.extend(cell_imports)
+                        except:
+                            # If Python parsing fails, create a generic code element
+                            elements.append(CodeElement(
+                                id=f"{file_path}:cell_{i}",
+                                repository_id="",
+                                file_path=file_path,
+                                element_type=ElementType.FUNCTION,
+                                name=f"cell_{i}",
+                                full_name=f"{file_path}:cell_{i}",
+                                start_line=i + 1,
+                                end_line=i + 1,
+                                code_snippet=cell_source[:200] + "..." if len(cell_source) > 200 else cell_source
+                            ))
+                            
+        except json.JSONDecodeError:
+            # If JSON parsing fails, treat as generic file
+            pass
+            
         return elements, imports
     
     def _parse_generic(self, file_path: str, content: str) -> List[CodeElement]:

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText, Code, Box, BookOpen, Home, Search, ChevronRight } from 'lucide-react';
+import { cleanRepositoryPath } from '../../services/repositories';
 
 const DocumentationNavigation = ({ 
   repository, 
@@ -25,7 +26,7 @@ const DocumentationNavigation = ({
         </h2>
         {repository && (
           <div className="flex items-center text-sm text-gray-500 mt-1">
-            <span className="truncate">{repository.url || repository.path}</span>
+            <span className="truncate">{cleanRepositoryPath(repository.url || repository.path)}</span>
           </div>
         )}
       </div>

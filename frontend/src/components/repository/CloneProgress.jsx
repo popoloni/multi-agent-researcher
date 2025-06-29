@@ -32,6 +32,7 @@ import {
   CloudDownload as DownloadingIcon
 } from '@mui/icons-material';
 import { githubService } from '../../services/github';
+import { cleanRepositoryPath } from '../../services/repositories';
 
 const CloneProgress = ({ 
   cloneOperations = [], 
@@ -301,7 +302,7 @@ const CloneProgress = ({
                       </ListItemIcon>
                       <ListItemText
                         primary="Local Path"
-                        secondary={operation.local_path}
+                        secondary={cleanRepositoryPath(operation.local_path)}
                       />
                     </ListItem>
                   )}

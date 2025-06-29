@@ -65,7 +65,9 @@ export const githubService = {
    */
   cloneRepository: async (repoData) => {
     try {
-      const response = await api.post('/github/repositories/clone', repoData);
+      const response = await api.post('/github/repositories/clone', repoData, {
+        timeout: 300000, // 5 minutes timeout for clone operations
+      });
       return response.data;
     } catch (error) {
       console.error('Repository clone failed:', error);

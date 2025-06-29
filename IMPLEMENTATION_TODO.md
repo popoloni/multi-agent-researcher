@@ -1,7 +1,14 @@
-# Multi-Agent Researcher - Implementation TODO Plan
+# Multi-Agent Researcher and Documenter - Implementation TODO Plan
 
 ## 🎯 **OBJECTIVE**
-Implement the complete happy path: GitHub repo selection → download → index → documentation generation → documentation access → documentation-aware chat with both local (Ollama) and remote (Anthropic) LLM support.
+Implement a system able to reverse enginner a source doe base into a useful documentation explaining what the source code does following this complete happy path: 
+1. GitHub repo selection → 
+2. clone and download → 
+3. index the repo  → 
+4. complete documentation generation → 
+5. documentation access → 
+6. documentation-aware chat with both local (Ollama) and remote (Anthropic) LLM support → 
+7. over internet multi agents research functionality
 
 ## 📊 **CURRENT STATUS SUMMARY**
 
@@ -667,27 +674,6 @@ Implement the complete happy path: GitHub repo selection → download → index 
   - Troubleshooting guide
   - Best practices documentation
 
----
-
-# **IMPLEMENTATION TIMELINE**
-
-## Week 1
-- **Days 1-2**: Phase 1 (GitHub Integration)
-- **Days 3-5**: Phase 2 (Documentation Generation) - Part 1
-
-## Week 2
-- **Days 1-2**: Phase 2 (Documentation Generation) - Part 2
-- **Days 3-4**: Phase 3 (Documentation UI)
-- **Day 5**: Phase 4 (Chat Enhancement) - Part 1
-
-## Week 3
-- **Days 1-2**: Phase 4 (Chat Enhancement) - Part 2
-- **Days 3-5**: Phase 5 (Persistence)
-
-## Week 4
-- **Days 1-2**: Phase 6 (Advanced Features)
-- **Days 3-4**: Testing and Quality Assurance
-- **Day 5**: Deployment and Documentation
 
 ---
 
@@ -699,14 +685,19 @@ Implement the complete happy path: GitHub repo selection → download → index 
 3. ✅ System generates comprehensive documentation from code
 4. ✅ User can view and navigate generated documentation
 5. ✅ User can chat about documentation with AI assistance
-6. ✅ System works with both Ollama (local) and Anthropic (remote) LLMs
-7. ✅ All data persists across sessions
-8. ✅ System handles errors gracefully with user feedback
+6. ✅ User can perform reseach over internet using the multi-agent paradigm
+
+## Technical requirements
+1. ✅ System works with both Ollama (local) and Anthropic (remote) LLMs
+2. ✅ All data persists across sessions, including dowloaded repo, documents, chat or research sessions
+3. ✅ System handles errors gracefully with user feedback
+4. ✅ any long running task should be handled in an async mode and status and completition of the task should be notified to the user
 
 ## Performance Targets
 - Repository indexing: < 2 minutes for typical repos
-- Documentation generation: < 5 minutes for typical repos
+- Documentation generation: < 10 minutes for typical repos (but with realtime progress update)
 - Chat response time: < 10 seconds (Ollama), < 5 seconds (Anthropic)
+- Research over interent with multi agents: < 10 minutes (but with realtime progress update)
 - UI responsiveness: < 200ms for all interactions
 
 ## Quality Targets

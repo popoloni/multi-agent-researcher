@@ -3,6 +3,7 @@ import { Plus, Search, Trash2, Eye, FileText, ExternalLink, GitBranch } from 'lu
 import { Link } from 'react-router-dom';
 import RepositoryForm from './RepositoryForm';
 import StatusBadge from '../common/StatusBadge';
+import { repositoryService, cleanRepositoryPath } from '../../services/repositories';
 
 const RepositoryList = ({ repositories, onAddRepository, onDeleteRepository, isLoading }) => {
   const [showAddForm, setShowAddForm] = useState(false);
@@ -143,7 +144,9 @@ const RepositoryRow = ({ repository, onDelete }) => {
           </div>
         )}
       </div>
-      <div className="col-span-4 text-gray-600 truncate">{repository.path || repository.url || 'N/A'}</div>
+      <div className="col-span-4 text-gray-600 truncate">
+        {cleanRepositoryPath(repository.path || repository.url) || 'N/A'}
+      </div>
       <div className="col-span-2">
         <StatusBadge status={repository.status || 'indexed'} />
       </div>

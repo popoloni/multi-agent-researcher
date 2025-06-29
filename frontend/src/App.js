@@ -7,12 +7,14 @@ import Chat from './pages/Chat';
 import Documentation from './pages/Documentation';
 import FunctionalitiesPage from './pages/FunctionalitiesPage';
 import Layout from './components/layout/Layout';
+import { NotificationProvider } from './contexts/NotificationContext';
 import './styles/globals.css';
 
 function App() {
   return (
-    <Router>
-      <div className="App">
+    <NotificationProvider>
+      <Router>
+        <div className="App">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/repositories" element={<Repositories />} />
@@ -38,8 +40,9 @@ function App() {
           />
           <Route path="/chat" element={<Chat />} />
         </Routes>
-      </div>
-    </Router>
+        </div>
+      </Router>
+    </NotificationProvider>
   );
 }
 

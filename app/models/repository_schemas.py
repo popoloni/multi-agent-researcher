@@ -14,6 +14,8 @@ class LanguageType(str, Enum):
     JAVA = "java"
     CSHARP = "csharp"
     GO = "go"
+    R = "r"
+    JUPYTER = "jupyter"
     UNKNOWN = "unknown"
 
 class ElementType(str, Enum):
