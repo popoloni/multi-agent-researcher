@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Settings, User, MessageSquare, Home, FolderOpen, Globe } from 'lucide-react';
 import NotificationBadge from '../common/NotificationBadge';
-import { useNotifications } from '../../contexts/NotificationContext';
 
 const Header = () => {
   const location = useLocation();
