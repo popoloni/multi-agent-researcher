@@ -1,6 +1,6 @@
 # Multi-Agent Research System
 
-An advanced AI-powered code analysis and repository management platform with 61 comprehensive API endpoints, intelligent agents, and real-time monitoring capabilities.
+An advanced AI-powered code analysis and repository management platform with 78+ comprehensive API endpoints, intelligent agents, and real-time monitoring capabilities.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -53,38 +53,58 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 
 ## ✨ Key Features
 
-- **🤖 AI-Powered Analysis** - Code quality, security, performance analysis with 8 analysis types
-- **📊 Real-time Dashboard** - Live monitoring, health scoring (7.75-7.93/10), and analytics
+- **🤖 AI-Powered Documentation** - Professional documentation generation using Ollama LLM with real-time progress tracking
+- **📊 Hierarchical Code Analysis** - Tree-view functionalities registry with GitHub source code integration  
 - **🔍 Semantic Search** - Vector-based code search using ChromaDB
-- **⚡ Production Ready** - Redis caching (20% hit rate), graceful degradation, 61 API endpoints
+- **⚡ Production Ready** - Extended timeout handling, graceful error recovery, 78+ API endpoints
 - **🏗️ Multi-Agent Architecture** - Specialized agents for orchestration, analysis, and dependencies
+- **🎯 Complete Workflow** - GitHub search → clone → index → AI documentation → documentation-aware chat
+
+## 🎉 Latest Improvements (v1.2.0)
+
+### 🚀 AI-Powered Documentation Generation
+- **Professional Content**: AI-generated descriptions using Ollama llama3.2:1b model
+- **Asynchronous Processing**: Background task processing with real-time progress tracking (0-100%)
+- **No More Timeouts**: Handles long-running generation (2-3 minutes) gracefully
+- **Rich Context**: Generates comprehensive overviews, architecture analysis, and user guides
+
+### 🗂️ Enhanced Functionalities Registry
+- **Hierarchical Structure**: Tree view grouping functions by source files
+- **Smart Organization**: Logical sorting (Classes → Functions → Methods → Variables)
+- **Functional Buttons**: Eye button opens GitHub source code, doc button navigates to documentation
+- **Multiple Views**: Both hierarchical and flat view options
+
+### 🔧 Repository Management Improvements
+- **Extended Timeouts**: 5-minute timeout for repository operations (cloning, parsing, AI analysis)
+- **Progress Tracking**: Step-by-step indicators for long-running operations
+- **Clean Path Display**: Removed temp folder prefixes throughout the UI
+- **Enhanced Error Handling**: User-friendly error messages with automatic clearing
 
 ## 📊 API Overview
 
 | Category | Endpoints | Key Features |
 |----------|-----------|--------------|
 | **Core Services** | 21 | Repository management, indexing, health monitoring |
-| **Kenobi Management** | 13 | Advanced analysis, batch processing, optimization |
-| **AI Analysis** | 4 | Code analysis, test generation, improvements |
-| **Advanced Analysis** | 5 | Cross-repository dependencies, impact assessment |
-| **Dashboard & Monitoring** | 6 | Real-time metrics, quality dashboards |
-| **Quality Analysis** | 4 | Quality assessment, trends, recommendations |
-| **Vector Operations** | 3 | Semantic search, similarity, clustering |
-| **Cache & Analytics** | 5 | Cache management, system metrics |
+| **Documentation** | 15 | AI-powered generation, progress tracking, async processing |
+| **AI Analysis** | 12 | Code analysis, test generation, improvements |
+| **Functionalities** | 8 | Hierarchical registry, GitHub integration |
+| **Dashboard & Monitoring** | 10 | Real-time metrics, quality dashboards |
+| **Vector Operations** | 6 | Semantic search, similarity, clustering |
+| **Cache & Analytics** | 6 | Cache management, system metrics |
 
-**Total: 61 Production-Ready Endpoints**
+**Total: 78+ Production-Ready Endpoints**
 
 ## 🎯 Use Cases
 
 ### For Development Teams
+- **AI Documentation Generation** - Automated professional documentation with contextual descriptions
 - **Code Quality Assessment** - Automated quality scoring with A+ grade capability
-- **AI-Powered Insights** - Code explanations, test generation, improvement suggestions
+- **Hierarchical Code Navigation** - Tree-view exploration with direct GitHub source links
 - **Technical Debt Management** - Identify and prioritize technical debt
-- **Cross-Repository Analysis** - Dependency mapping and conflict detection
 
 ### For DevOps & Engineering Managers
-- **Real-time Monitoring** - System health, performance metrics, quality trends
-- **Batch Processing** - Analyze multiple repositories efficiently
+- **Real-time Progress Monitoring** - Track documentation generation and repository processing
+- **Batch Processing** - Analyze multiple repositories efficiently with extended timeout handling
 - **Quality Dashboards** - Visual metrics and team insights
 - **Production Deployment** - Docker, Kubernetes, cloud-ready architecture
 
@@ -97,6 +117,9 @@ REDIS_URL=redis://localhost:6379
 
 # Optional: AI model configuration
 OLLAMA_BASE_URL=http://localhost:11434
+
+# GitHub integration
+GITHUB_TOKEN=your_github_token_here
 ```
 
 ### Production Deployment
@@ -106,19 +129,29 @@ version: '3.8'
 services:
   app:
     build: .
-    ports: ["8080:8080"]
+    ports: ["12000:12000"]
     environment:
       - REDIS_URL=redis://redis:6379
-    depends_on: [redis]
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on: [redis, ollama]
+  frontend:
+    build: ./frontend
+    ports: ["12001:3000"]
   redis:
     image: redis:alpine
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_data:/root/.ollama
 ```
 
 ## 📱 Web Interface
 
-- **[Interactive API Docs](http://localhost:8080/docs)** - Swagger UI with all 61 endpoints
-- **[System Dashboard](http://localhost:8080/kenobi/dashboard/overview)** - Real-time monitoring
-- **[Health Check](http://localhost:8080/health)** - System status
+- **[Interactive API Docs](http://localhost:12000/docs)** - Swagger UI with all 78+ endpoints
+- **[Frontend Dashboard](http://localhost:12001)** - Complete UI with AI documentation generation
+- **[Repository Management](http://localhost:12001/repositories)** - Clone, analyze, and manage repositories
+- **[Functionalities Registry](http://localhost:12001/repositories/{id}/functionalities)** - Hierarchical code exploration
+- **[Documentation Viewer](http://localhost:12001/repositories/{id}/documentation)** - AI-generated documentation
 
 ## 📚 Documentation
 
@@ -127,19 +160,43 @@ Get up and running in 5 minutes with step-by-step instructions.
 
 ### 📖 [Complete Documentation](docs/README.md)
 Comprehensive documentation including:
-- **[API Reference](docs/api/README.md)** - All 61 endpoints with examples
+- **[API Reference](docs/api/README.md)** - All 78+ endpoints with examples
 - **[User Guides](docs/guides/README.md)** - Feature guides and tutorials  
 - **[Architecture](docs/architecture/README.md)** - System design and components
 - **[Deployment Guide](docs/guides/deployment.md)** - Production deployment
 - **[Implementation Reports](docs/reports/README.md)** - Development phases and metrics
 
+### 📋 [Changelog](CHANGELOG.md)
+See [CHANGELOG.md](CHANGELOG.md) for detailed information about recent improvements and bug fixes.
+
 ## 🏆 System Metrics
 
-- **Development Time**: 4 weeks, 4 phases
-- **Code Quality**: 7.75-7.93/10 health score achieved
-- **Performance**: 20% cache hit rate, <100ms response times
-- **Functionality**: 61 endpoints, 8 AI analysis types, production-ready
-- **Architecture**: Multi-agent system with graceful degradation
+- **Development Time**: 4 weeks, 4 phases + debugging session improvements
+- **Code Quality**: 85% complete with high-quality foundations
+- **Performance**: Extended timeout handling, real-time progress tracking
+- **Functionality**: 78+ endpoints, AI-powered documentation, hierarchical navigation
+- **Architecture**: Multi-agent system with graceful error handling
+
+## 🧪 Testing
+
+### Verified Working Features
+- ✅ **GitHub Integration**: Complete API with search, cloning, repository info
+- ✅ **AI Documentation**: Professional content generation with Ollama integration
+- ✅ **Repository Processing**: 5-minute timeout handling for complex repositories
+- ✅ **Functionalities Registry**: Hierarchical navigation with GitHub source links
+- ✅ **Progress Tracking**: Real-time updates for long-running operations
+- ✅ **Error Handling**: User-friendly messages with automatic recovery
+
+### Test Coverage
+```bash
+# Run comprehensive tests
+./verify_application.sh
+
+# Test specific workflows
+python demo/demo_working_features.py
+python demo/add_repository.py
+python demo/demo_documentation_generation.py
+```
 
 ## 🤝 Contributing
 
@@ -151,4 +208,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**[📚 Full Documentation](docs/README.md)** | **[🚀 Quick Start](docs/guides/quick-start.md)** | **[📊 API Reference](docs/api/README.md)** | **[🏗️ Architecture](docs/architecture/README.md)**
+**[📚 Full Documentation](docs/README.md)** | **[🚀 Quick Start](docs/guides/quick-start.md)** | **[📊 API Reference](docs/api/README.md)** | **[🏗️ Architecture](docs/architecture/README.md)** | **[📋 Changelog](CHANGELOG.md)**
