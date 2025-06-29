@@ -451,12 +451,67 @@ Implement the complete happy path: GitHub repo selection → download → index 
 
 ---
 
-# **PHASE 6: Advanced Features and Polish**
+# **PHASE 6: Web Research Enhancement**
+*Priority: HIGH | Estimated Time: 2-3 days*
+
+## 6.1 Real Search API Integration
+
+### **Task 6.1.1: Implement Real Search API**
+- **File**: `app/tools/search_tools.py`
+- **Implementation**:
+  - Replace mock search with real search API (Google, Bing, or Tavily)
+  - Implement proper rate limiting and error handling
+  - Add caching for search results
+  - Support different search types (web, news, images)
+
+### **Task 6.1.2: Enhanced Search Results Processing**
+- **File**: `app/tools/content_processor.py`
+- **Features**:
+  - HTML content extraction and cleaning
+  - Text summarization for long content
+  - Relevance scoring improvements
+  - Content categorization
+
+### **Task 6.1.3: Research Analytics**
+- **File**: `app/services/analytics_service.py`
+- **Features**:
+  - Track search performance metrics
+  - Analyze query patterns
+  - Generate research insights
+  - Optimize search strategies based on past performance
+
+## 6.2 Research UI Enhancements
+
+### **Task 6.2.1: Advanced Research Options**
+- **File**: `frontend/src/components/research/AdvancedResearchOptions.jsx`
+- **Features**:
+  - Source filtering (academic, news, blogs)
+  - Time range selection
+  - Language preferences
+  - Result format options
+
+### **Task 6.2.2: Research History**
+- **File**: `frontend/src/components/research/ResearchHistory.jsx`
+- **Features**:
+  - Save and view past research
+  - Compare research results
+  - Continue previous research
+  - Export research in different formats
+
+### **Task 6.2.3: Interactive Research Results**
+- **File**: `frontend/src/components/research/InteractiveResearchResult.jsx`
+- **Features**:
+  - Interactive visualization of research data
+  - Source exploration and filtering
+  - Citation management
+  - Follow-up question generation
+
+# **PHASE 7: Advanced Features and Polish**
 *Priority: LOW-MEDIUM | Estimated Time: 2-3 days*
 
-## 6.1 Advanced UI Features
+## 7.1 Advanced UI Features
 
-### **Task 6.1.1: Repository Dashboard**
+### **Task 7.1.1: Repository Dashboard**
 - **File**: `frontend/src/components/repository/RepositoryDashboard.jsx`
 - **Features**:
   - Repository health metrics
@@ -464,7 +519,7 @@ Implement the complete happy path: GitHub repo selection → download → index 
   - Recent activity timeline
   - Quick action buttons
 
-### **Task 6.1.2: Documentation Analytics**
+### **Task 7.1.2: Documentation Analytics**
 - **File**: `frontend/src/components/documentation/DocumentationAnalytics.jsx`
 - **Features**:
   - Documentation quality metrics
@@ -472,7 +527,7 @@ Implement the complete happy path: GitHub repo selection → download → index 
   - Popular sections tracking
   - Improvement suggestions
 
-### **Task 6.1.3: Advanced Search**
+### **Task 7.1.3: Advanced Search**
 - **File**: `frontend/src/components/search/AdvancedSearch.jsx`
 - **Features**:
   - Cross-repository search
@@ -480,9 +535,9 @@ Implement the complete happy path: GitHub repo selection → download → index 
   - Search filters and facets
   - Search result clustering
 
-## 6.2 Performance and Optimization
+## 7.2 Performance and Optimization
 
-### **Task 6.2.1: Caching System**
+### **Task 7.2.1: Caching System**
 - **File**: `app/services/cache_service.py`
 - **Enhancements**:
   - Documentation caching
@@ -490,7 +545,7 @@ Implement the complete happy path: GitHub repo selection → download → index 
   - Chat response caching
   - Cache invalidation strategies
 
-### **Task 6.2.2: Background Processing**
+### **Task 7.2.2: Background Processing**
 - **File**: `app/tasks/background_tasks.py`
 - **Implementation**:
   - Async documentation generation
@@ -498,7 +553,38 @@ Implement the complete happy path: GitHub repo selection → download → index 
   - Cleanup tasks
   - Health monitoring
 
-### **Task 6.2.3: API Rate Limiting**
+---
+
+# **PHASE 8: LLM Provider Integration**
+*Priority: MEDIUM | Estimated Time: 1-2 days*
+
+## 8.1 LLM Provider Switching
+
+### **Task 8.1.1: LLM Provider Interface**
+- **File**: `app/services/llm_service.py`
+- **Implementation**:
+  - Create unified interface for multiple LLM providers
+  - Support for OpenAI, Anthropic, Ollama, and local models
+  - Implement provider-specific optimizations
+  - Add fallback mechanisms
+
+### **Task 8.1.2: LLM Settings UI**
+- **File**: `frontend/src/components/settings/LLMSettings.jsx`
+- **Features**:
+  - Provider selection dropdown
+  - Model selection for each provider
+  - API key management
+  - Performance settings (temperature, max tokens)
+
+### **Task 8.1.3: LLM Performance Analytics**
+- **File**: `app/services/llm_analytics.py`
+- **Features**:
+  - Track token usage and costs
+  - Compare performance across providers
+  - Optimize prompt strategies
+  - Generate usage reports
+
+### **Task 8.1.4: API Rate Limiting**
 - **File**: `app/middleware/rate_limiting.py`
 - **Features**:
   - GitHub API rate limiting

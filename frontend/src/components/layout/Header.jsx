@@ -1,9 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Settings, Bell, User, Star, MessageSquare, Home, FolderOpen } from 'lucide-react';
+import { Settings, User, MessageSquare, Home, FolderOpen, Globe } from 'lucide-react';
+import NotificationBadge from '../common/NotificationBadge';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 const Header = () => {
   const location = useLocation();
+  const { } = useNotifications();
   
   const isActive = (path) => location.pathname === path;
   
@@ -53,24 +56,29 @@ const Header = () => {
               <MessageSquare className="w-4 h-4" />
               <span>Kenobi Chat</span>
             </Link>
+            <Link 
+              to="/research" 
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                isActive('/research') 
+                  ? 'bg-primary-100 text-primary-700' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>Web Research</span>
+            </Link>
           </nav>
         </div>
         
         <div className="flex items-center space-x-4 text-sm text-gray-600">
-          <div className="flex items-center space-x-2">
-            <Bell className="w-4 h-4" />
-            <span>Task pending</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Star className="w-4 h-4" />
-            <span>Favorites</span>
-          </div>
+          <NotificationBadge />
           <div className="flex items-center space-x-2">
             <User className="w-4 h-4" />
             <span>Research Agent</span>
           </div>
           <div className="flex items-center space-x-2">
             <Settings className="w-4 h-4" />
+            <span>Settings</span>
           </div>
         </div>
       </div>
