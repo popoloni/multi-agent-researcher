@@ -6,7 +6,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 
 const Header = () => {
   const location = useLocation();
-  const { } = useNotifications();
+  // Using NotificationContext via the NotificationBadge component
   
   const isActive = (path) => location.pathname === path;
   
