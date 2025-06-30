@@ -167,10 +167,10 @@ const Dashboard = () => {
                   <div className="flex items-center space-x-3">
                     <StatusBadge status={repo.status || 'indexed'} />
                     <Link
-                      to={`/repositories/${repo.id}/functionalities`}
+                      to={`/repositories/${repo.id}`}
                       className="text-primary-600 hover:text-primary-700 text-sm"
                     >
-                      View Functions
+                      View
                     </Link>
                   </div>
                 </div>
