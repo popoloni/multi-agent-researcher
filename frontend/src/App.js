@@ -6,6 +6,7 @@ import RepositoryDetails from './pages/RepositoryDetails';
 import Chat from './pages/Chat';
 import Documentation from './pages/Documentation';
 import FunctionalitiesPage from './pages/FunctionalitiesPage';
+import WebResearch from './pages/WebResearch';
 import Layout from './components/layout/Layout';
 import { NotificationProvider } from './contexts/NotificationContext';
 import './styles/globals.css';
@@ -39,6 +40,7 @@ function App() {
             } 
           />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/research" element={<WebResearch />} />
         </Routes>
         </div>
       </Router>

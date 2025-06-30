@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { GitBranch, FileText, Search, Activity, Plus } from 'lucide-react';
+import { GitBranch, FileText, Search, Activity, Plus, Globe } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -121,12 +121,12 @@ const Dashboard = () => {
             </Link>
             
             <Link
-              to="/documentation"
+              to="/research"
               className="p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors"
             >
-              <FileText className="w-8 h-8 text-primary-500 mb-2" />
-              <h3 className="font-medium">Documentation</h3>
-              <p className="text-sm text-gray-600">Browse generated documentation</p>
+              <Globe className="w-8 h-8 text-primary-500 mb-2" />
+              <h3 className="font-medium">Web Research</h3>
+              <p className="text-sm text-gray-600">Discover research papers and technical resources</p>
             </Link>
           </div>
         </div>
