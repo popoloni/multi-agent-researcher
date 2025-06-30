@@ -29,7 +29,7 @@ const DocumentationViewer = ({
       const extractedToc = matches.map((match, index) => {
         const level = match[1].length;
         const text = match[2];
-        const id = text.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
+        const id = (text || '').toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
         
         return { id, text, level, index };
       });
@@ -86,15 +86,15 @@ const DocumentationViewer = ({
   // Custom components for ReactMarkdown
   const components = {
     h1: ({ node, ...props }) => {
-      const id = props.children[0].toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
+      const id = (props.children?.[0] || '').toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
       return <h1 id={id} className="text-3xl font-bold mt-8 mb-4 pb-2 border-b border-gray-200" {...props} />;
     },
     h2: ({ node, ...props }) => {
-      const id = props.children[0].toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
+      const id = (props.children?.[0] || '').toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
       return <h2 id={id} className="text-2xl font-bold mt-6 mb-3" {...props} />;
     },
     h3: ({ node, ...props }) => {
-      const id = props.children[0].toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
+      const id = (props.children?.[0] || '').toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
       return <h3 id={id} className="text-xl font-semibold mt-4 mb-2" {...props} />;
     },
     code: ({ node, inline, className, children, ...props }) => {

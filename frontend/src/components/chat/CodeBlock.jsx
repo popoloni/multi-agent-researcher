@@ -38,7 +38,7 @@ const CodeBlock = ({ code, language, fileName, lineNumbers = true }) => {
     if (!language) {
       // Try to detect from file extension if fileName is provided
       if (fileName) {
-        const ext = fileName.split('.').pop().toLowerCase();
+        const ext = fileName.split('.').pop()?.toLowerCase();
         const extMap = {
           'js': 'javascript',
           'ts': 'typescript',
