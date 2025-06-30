@@ -27,11 +27,22 @@ const Dashboard = () => {
       const repos = response.data.repositories || [];
       setRepositories(repos);
       
+      // Calculate total functions by fetching functionalities for each repository
+      let totalFunctions = 0;
+      for (const repo of repos) {
+        try {
+          const funcResponse = await repositoryService.getFunctionalitiesRegistry(repo.id);
+          totalFunctions += funcResponse.data.total_count || 0;
+        } catch (error) {
+          console.warn(`Failed to get functions for repository ${repo.id}:`, error);
+        }
+      }
+      
       // Calculate stats
       setStats({
         totalRepos: repos.length,
-        indexedRepos: repos.filter(r => r.status === 'indexed').length,
-        totalFunctions: repos.reduce((sum, r) => sum + (r.function_count || 0), 0),
+        indexedRepos: repos.length, // All repositories returned are indexed
+        totalFunctions: totalFunctions,
         recentActivity: repos.slice(0, 5) // Show recent 5
       });
     } catch (error) {
