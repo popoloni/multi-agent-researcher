@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings:
+    # Database Configuration
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./kenobi.db")
+    
     # API Keys
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     

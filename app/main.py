@@ -23,6 +23,9 @@ from app.services.indexing_service import SearchFilters
 from app.services.research_service import ResearchService
 from app.services.github_service import github_service, GitHubService
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -49,36 +52,200 @@ if os.path.exists(frontend_build_path):
 research_service = ResearchService()
 kenobi_agent = KenobiAgent()
 
-# In-memory storage for generated documentation
-# In production, this should be replaced with a proper database
-documentation_storage = {}
+# Initialize documentation service (replaces in-memory storage)
+from app.services.documentation_service import documentation_service
+
+# Initialize analysis service (replaces in-memory storage)
+from app.services.analysis_service import analysis_service
 
 # Add storage for documentation generation tasks
 documentation_generation_storage = {}
 
-@app.get("/", response_class=HTMLResponse)
+# Application state tracking
+app_state = {
+    "database_initialized": False,
+    "database_error": None,
+    "startup_time": None
+}
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    startup_start = datetime.utcnow()
+    
+    # Phase 4 startup banner
+    print("Multi-Agent Research System starting up...")
+    print("🚀 Phase 4 Kenobi Code Analysis Agent - COMPLETE")
+    print("=" * 60)
+    print("📊 DASHBOARD & ANALYTICS:")
+    print("  - Real-time dashboard with live metrics")
+    print("  - Repository overview and health monitoring")
+    print("  - Quality trends and performance analytics")
+    print("  - Dependency visualization and insights")
+    print("")
+    print("🔧 ADVANCED ANALYSIS:")
+    print("  - Comprehensive repository analysis")
+    print("  - Cross-repository dependency mapping")
+    print("  - Dependency impact assessment")
+    print("  - Pattern detection and anti-pattern identification")
+    print("")
+    print("⚡ PERFORMANCE & CACHING:")
+    print("  - Redis-based caching with in-memory fallback")
+    print("  - Real-time monitoring and alerting")
+    print("  - Performance metrics and optimization")
+    print("  - Cache management and invalidation")
+    print("")
+    print("🎯 PRODUCTION FEATURES:")
+    print("  - Complete API coverage (25+ endpoints)")
+    print("  - Agent hierarchy with specialized analysis")
+    print("  - Error handling and graceful degradation")
+    print("  - Comprehensive logging and monitoring")
+    print("=" * 60)
+    
+    logger.info("Starting Multi-Agent Research System initialization...")
+    
+    try:
+        # Initialize repository service with database
+        logger.info("Initializing repository service with database...")
+        await kenobi_agent.repository_service.initialize()
+        
+        app_state["database_initialized"] = True
+        app_state["database_error"] = None
+        logger.info("Database initialized successfully")
+        
+        # Log repository count
+        repos = await kenobi_agent.repository_service.list_repositories()
+        logger.info(f"Found {len(repos)} repositories in database")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        app_state["database_initialized"] = False
+        app_state["database_error"] = str(e)
+        # Continue with in-memory storage as fallback
+        logger.warning("Continuing with in-memory storage as fallback")
+    
+    # Initialize Phase 4 services
+    try:
+        from app.services.cache_service import cache_service
+        await cache_service.initialize()
+        print("✅ Cache service initialized")
+    except Exception as e:
+        print(f"⚠️  Cache service initialization failed: {e}")
+    
+    # Initialize documentation service
+    try:
+        # Note: documentation_service is already imported and initialized
+        # Migration from memory storage would happen here if needed
+        print("✅ Documentation service ready")
+    except Exception as e:
+        print(f"⚠️  Documentation service initialization failed: {e}")
+    
+    app_state["startup_time"] = datetime.utcnow()
+    startup_duration = (app_state["startup_time"] - startup_start).total_seconds()
+    logger.info(f"Application startup completed in {startup_duration:.3f} seconds")
+    print("🎉 Phase 4 implementation complete - Ready for production!")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    print("Multi-Agent Research System shutting down...")
+    logger.info("Shutting down Multi-Agent Research System...")
+    
+    try:
+        # Close database connections
+        if hasattr(kenobi_agent.repository_service, 'db_service'):
+            await kenobi_agent.repository_service.db_service.close()
+            logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
+    
+    # Cleanup Phase 4 services
+    try:
+        from app.services.cache_service import cache_service
+        await cache_service.close()
+        print("✅ Cache service closed")
+    except Exception as e:
+        print(f"⚠️  Cache service cleanup failed: {e}")
+    
+    try:
+        from app.engines.analytics_engine import analytics_engine
+        await analytics_engine.stop_real_time_monitoring()
+        print("✅ Analytics monitoring stopped")
+    except Exception as e:
+        print(f"⚠️  Analytics cleanup failed: {e}")
+    
+    logger.info("Shutdown completed")
+    print("👋 Phase 4 Kenobi shutdown complete")
+
+@app.get("/")
 async def root():
     """Serve the React frontend"""
     frontend_index = os.path.join(frontend_build_path, "index.html")
     if os.path.exists(frontend_index):
         return FileResponse(frontend_index)
     else:
-        return {
+        return JSONResponse({
             "status": "healthy",
             "service": "Multi-Agent Research System",
             "version": "1.0.0",
             "message": "Frontend not built yet. Run 'npm run build' in the frontend directory."
-        }
+        })
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
+    """Enhanced health check endpoint with database status"""
+    health_status = {
         "status": "healthy",
         "service": "Multi-Agent Research System",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "uptime_seconds": None,
+        "database": {
+            "initialized": app_state["database_initialized"],
+            "status": "unknown",
+            "error": app_state["database_error"]
+        },
+        "services": {
+            "repository_service": "unknown",
+            "research_service": "healthy"
+        }
     }
+    
+    # Calculate uptime
+    if app_state["startup_time"]:
+        uptime = (datetime.utcnow() - app_state["startup_time"]).total_seconds()
+        health_status["uptime_seconds"] = round(uptime, 2)
+    
+    # Check database health
+    try:
+        if app_state["database_initialized"]:
+            db_health = await kenobi_agent.repository_service.db_service.health_check()
+            health_status["database"]["status"] = "healthy" if db_health else "unhealthy"
+        else:
+            health_status["database"]["status"] = "not_initialized"
+    except Exception as e:
+        health_status["database"]["status"] = "error"
+        health_status["database"]["error"] = str(e)
+    
+    # Check repository service
+    try:
+        repos = await kenobi_agent.repository_service.list_repositories()
+        health_status["services"]["repository_service"] = "healthy"
+        health_status["repository_count"] = len(repos)
+    except Exception as e:
+        health_status["services"]["repository_service"] = f"error: {str(e)}"
+    
+    # Determine overall status
+    if (health_status["database"]["status"] in ["healthy", "not_initialized"] and 
+        health_status["services"]["repository_service"] == "healthy"):
+        health_status["status"] = "healthy"
+    else:
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 @app.get("/test-kenobi")
 async def test_kenobi():
@@ -531,6 +698,17 @@ async def index_repository(repo_request: RepositoryIndexRequest):
             # Analyze the repository from local path
             analysis = await kenobi_agent.analyze_repository(local_path)
         
+        # Save analysis results to database for future use
+        try:
+            await analysis_service.save_analysis_results(
+                repository_id=analysis.repository.id,
+                analysis=analysis,
+                branch="main"  # Default branch
+            )
+            logger.info(f"Saved analysis for {analysis.repository.id} to database during indexing")
+        except Exception as save_error:
+            logger.warning(f"Failed to save analysis to database during indexing: {save_error}")
+        
         response_data = {
             "status": "success",
             "repository_id": analysis.repository.id,
@@ -555,15 +733,38 @@ async def get_repository_analysis(repo_id: str) -> RepositoryAnalysis:
     Get complete analysis of a repository
     
     Returns detailed analysis including all code elements, dependencies,
-    and AI-generated insights.
+    and AI-generated insights. Uses database-backed AnalysisService with cache-first strategy.
     """
     try:
         repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
         if not repository:
             raise HTTPException(status_code=404, detail="Repository not found")
         
-        analysis = await kenobi_agent.repository_service.analyze_repository(repo_id)
-        return analysis
+        # Try to get analysis from AnalysisService (database + cache)
+        analysis_result = await analysis_service.get_analysis_results(repo_id)
+        
+        if analysis_result:
+            # Convert stored analysis back to RepositoryAnalysis format
+            # For now, return the stored analysis data
+            logger.info(f"Retrieved analysis for {repo_id} from database/cache")
+            return analysis_result.analysis_result.analysis_data
+        else:
+            # Fallback: Generate new analysis using repository service
+            logger.info(f"Generating new analysis for {repo_id}")
+            analysis = await kenobi_agent.repository_service.analyze_repository(repo_id)
+            
+            # Save the analysis to database for future use
+            try:
+                await analysis_service.save_analysis_results(
+                    repository_id=repo_id,
+                    analysis=analysis,
+                    branch="main"  # Default branch
+                )
+                logger.info(f"Saved analysis for {repo_id} to database")
+            except Exception as save_error:
+                logger.warning(f"Failed to save analysis to database: {save_error}")
+            
+            return analysis
         
     except HTTPException:
         raise
@@ -1280,15 +1481,21 @@ See the code snippets in the API Reference for usage examples."""
                     }
                 }
                 
-                # Store the generated documentation in memory
-                doc_key = f"{repository_id}:{branch}"
-                documentation_storage[doc_key] = {
+                # Store the generated documentation using documentation service
+                documentation_data = {
                     "documentation": documentation,
                     "repository_id": repository_id,
                     "branch": branch,
                     "generated_at": datetime.now().isoformat(),
                     "status": "success"
                 }
+                
+                # Save to database with vector preparation
+                await documentation_service.save_documentation(
+                    repository_id, 
+                    documentation_data, 
+                    branch
+                )
 
                 # Mark task as completed
                 documentation_generation_storage[task_id].update({
@@ -1355,18 +1562,20 @@ async def get_documentation(repository_id: str, branch: str = "main") -> Dict[st
     Returns previously generated documentation if available.
     """
     try:
-        # Check if documentation exists in storage
-        doc_key = f"{repository_id}:{branch}"
+        # Get documentation using documentation service
+        doc_result = await documentation_service.get_documentation(repository_id, branch)
 
-        if doc_key in documentation_storage:
-            stored_doc = documentation_storage[doc_key]
+        if doc_result and doc_result.documentation:
             return {
-                "documentation": stored_doc["documentation"],
+                "documentation": doc_result.documentation.content,
                 "repository_id": repository_id,
                 "branch": branch,
                 "status": "generated",
-                "last_generated": stored_doc["generated_at"],
-                "message": "Documentation found"
+                "last_generated": doc_result.documentation.generated_at.isoformat(),
+                "message": "Documentation found",
+                "cached": doc_result.cached,
+                "chunks_prepared": len(doc_result.chunks),
+                "vector_indexed": doc_result.documentation.vector_indexed
             }
         else:
             return {
@@ -1379,6 +1588,177 @@ async def get_documentation(repository_id: str, branch: str = "main") -> Dict[st
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Documentation retrieval failed: {str(e)}")
+
+@app.get("/kenobi/documentation/list")
+async def list_documentation(limit: int = 100) -> Dict[str, Any]:
+    """
+    List all documentation entries
+    """
+    try:
+        docs = await documentation_service.list_documentation(limit)
+        
+        return {
+            "documentation_entries": [
+                {
+                    "id": doc.id,
+                    "repository_id": doc.repository_id,
+                    "format": doc.format,
+                    "vector_indexed": doc.vector_indexed,
+                    "generated_at": doc.generated_at.isoformat(),
+                    "content_length": len(doc.content) if doc.content else 0
+                }
+                for doc in docs
+            ],
+            "total_count": len(docs),
+            "limit": limit
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Documentation listing failed: {str(e)}")
+
+@app.delete("/kenobi/repositories/{repository_id}/documentation")
+async def delete_documentation(repository_id: str, branch: str = "main") -> Dict[str, Any]:
+    """
+    Delete documentation for a repository
+    """
+    try:
+        success = await documentation_service.delete_documentation(repository_id, branch)
+        
+        if success:
+            return {
+                "status": "deleted",
+                "repository_id": repository_id,
+                "branch": branch,
+                "message": "Documentation deleted successfully"
+            }
+        else:
+            return {
+                "status": "not_found",
+                "repository_id": repository_id,
+                "branch": branch,
+                "message": "Documentation not found"
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Documentation deletion failed: {str(e)}")
+
+@app.get("/kenobi/documentation/stats")
+async def get_documentation_stats() -> Dict[str, Any]:
+    """
+    Get documentation service statistics
+    """
+    try:
+        cache_stats = await documentation_service.get_cache_stats()
+        docs = await documentation_service.list_documentation(1000)  # Get more for stats
+        
+        # Calculate statistics
+        total_docs = len(docs)
+        vector_indexed_count = sum(1 for doc in docs if doc.vector_indexed)
+        total_content_length = sum(len(doc.content) if doc.content else 0 for doc in docs)
+        
+        return {
+            "total_documentation_entries": total_docs,
+            "vector_indexed_entries": vector_indexed_count,
+            "vector_indexing_percentage": (vector_indexed_count / total_docs * 100) if total_docs > 0 else 0,
+            "total_content_length": total_content_length,
+            "average_content_length": total_content_length / total_docs if total_docs > 0 else 0,
+            "cache_stats": cache_stats
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Documentation stats retrieval failed: {str(e)}")
+
+# ========== Analysis Service Endpoints ==========
+
+@app.get("/kenobi/analysis/list")
+async def list_analysis_results(limit: int = 100) -> Dict[str, Any]:
+    """
+    List all analysis results with metadata
+    
+    Returns a list of all stored analysis results with basic metadata.
+    """
+    try:
+        results = await analysis_service.list_analysis_results()
+        return {
+            "status": "success",
+            "count": len(results),
+            "analysis_results": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis listing failed: {str(e)}")
+
+@app.delete("/kenobi/repositories/{repository_id}/analysis")
+async def delete_analysis_results(repository_id: str, branch: str = "main") -> Dict[str, Any]:
+    """
+    Delete analysis results for a repository
+    """
+    try:
+        success = await analysis_service.delete_analysis_results(repository_id, branch)
+        if success:
+            return {
+                "status": "success",
+                "message": f"Analysis results deleted for repository {repository_id}"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Analysis results not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis deletion failed: {str(e)}")
+
+@app.get("/kenobi/analysis/search")
+async def search_code_snippets(
+    query: str,
+    repository_id: str = None,
+    snippet_type: str = None,
+    limit: int = 50
+) -> Dict[str, Any]:
+    """
+    Search code snippets across analysis results
+    
+    Performs text-based search across stored code snippets.
+    """
+    try:
+        results = await analysis_service.search_code_snippets(
+            query=query,
+            repository_id=repository_id,
+            snippet_type=snippet_type
+        )
+        return {
+            "status": "success",
+            "query": query,
+            "count": len(results),
+            "results": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code snippet search failed: {str(e)}")
+
+@app.get("/kenobi/analysis/stats")
+async def get_analysis_stats() -> Dict[str, Any]:
+    """
+    Get analysis service statistics
+    
+    Returns cache performance and database statistics.
+    """
+    try:
+        cache_stats = await analysis_service.cache_service.get_cache_stats()
+        results = await analysis_service.list_analysis_results()
+        
+        # Calculate additional statistics
+        total_repositories = len(set(result["repository_id"] for result in results))
+        # Note: code_snippets count not available in list_analysis_results summary
+        total_code_snippets = 0  # Would need separate query to get accurate count
+        
+        return {
+            "status": "success",
+            "cache_stats": cache_stats,
+            "database_stats": {
+                "total_analysis_results": len(results),
+                "total_repositories": total_repositories,
+                "total_code_snippets": total_code_snippets,
+                "average_snippets_per_analysis": total_code_snippets / len(results) if results else 0
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis stats failed: {str(e)}")
 
 @app.get("/kenobi/status")
 async def get_kenobi_status() -> Dict[str, Any]:
@@ -2559,66 +2939,3 @@ async def serve_spa(path: str):
     else:
         raise HTTPException(status_code=404, detail="Frontend not built")
 
-# Startup and shutdown events
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    print("Multi-Agent Research System starting up...")
-    print("🚀 Phase 4 Kenobi Code Analysis Agent - COMPLETE")
-    print("=" * 60)
-    print("📊 DASHBOARD & ANALYTICS:")
-    print("  - Real-time dashboard with live metrics")
-    print("  - Repository overview and health monitoring")
-    print("  - Quality trends and performance analytics")
-    print("  - Dependency visualization and insights")
-    print("")
-    print("🔧 ADVANCED ANALYSIS:")
-    print("  - Comprehensive repository analysis")
-    print("  - Cross-repository dependency mapping")
-    print("  - Dependency impact assessment")
-    print("  - Pattern detection and anti-pattern identification")
-    print("")
-    print("⚡ PERFORMANCE & CACHING:")
-    print("  - Redis-based caching with in-memory fallback")
-    print("  - Real-time monitoring and alerting")
-    print("  - Performance metrics and optimization")
-    print("  - Cache management and invalidation")
-    print("")
-    print("🎯 PRODUCTION FEATURES:")
-    print("  - Complete API coverage (25+ endpoints)")
-    print("  - Agent hierarchy with specialized analysis")
-    print("  - Error handling and graceful degradation")
-    print("  - Comprehensive logging and monitoring")
-    print("=" * 60)
-    
-    # Initialize Phase 4 services
-    try:
-        from app.services.cache_service import cache_service
-        await cache_service.initialize()
-        print("✅ Cache service initialized")
-    except Exception as e:
-        print(f"⚠️  Cache service initialization failed: {e}")
-    
-    print("🎉 Phase 4 implementation complete - Ready for production!")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    print("Multi-Agent Research System shutting down...")
-    
-    # Cleanup Phase 4 services
-    try:
-        from app.services.cache_service import cache_service
-        await cache_service.close()
-        print("✅ Cache service closed")
-    except Exception as e:
-        print(f"⚠️  Cache service cleanup failed: {e}")
-    
-    try:
-        from app.engines.analytics_engine import analytics_engine
-        await analytics_engine.stop_real_time_monitoring()
-        print("✅ Analytics monitoring stopped")
-    except Exception as e:
-        print(f"⚠️  Analytics cleanup failed: {e}")
-    
-    print("👋 Phase 4 Kenobi shutdown complete")

@@ -16,6 +16,8 @@ from app.models.repository_schemas import (
 )
 from app.tools.code_parser import CodeParser
 from app.services.github_service import github_service
+from app.services.database_service import database_service
+from app.services.cache_service import cache_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +26,70 @@ class RepositoryService:
     
     def __init__(self):
         self.code_parser = CodeParser()
-        self.repositories: Dict[str, Repository] = {}
+        self.repositories: Dict[str, Repository] = {}  # Keep for cache
         self.analyses: Dict[str, RepositoryAnalysis] = {}
         self.clone_progress_callbacks: Dict[str, Callable] = {}
+        
+        # NEW: Add database service integration
+        self.db_service = database_service
+        self.cache_service = cache_service
+        self._initialized = False
+    
+    async def initialize(self):
+        """Initialize database and migrate existing data"""
+        if self._initialized:
+            return
+            
+        try:
+            # Initialize database service
+            await self.db_service.initialize()
+            
+            # Migrate existing in-memory repositories to database
+            await self._migrate_existing_repositories()
+            
+            # Load existing repositories from database into cache
+            await self._load_repositories_from_database()
+            
+            self._initialized = True
+            logger.info("Repository service initialized with database integration")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize repository service: {e}")
+            # Continue with in-memory storage as fallback
+            logger.warning("Continuing with in-memory storage only")
+    
+    async def _migrate_existing_repositories(self):
+        """Migrate existing in-memory repositories to database"""
+        if not self.repositories:
+            return
+            
+        migrated_count = 0
+        for repo_id, repository in self.repositories.items():
+            try:
+                await self.db_service.save_repository(repository)
+                migrated_count += 1
+                logger.info(f"Migrated repository {repo_id} to database")
+            except Exception as e:
+                logger.error(f"Failed to migrate repository {repo_id}: {e}")
+        
+        logger.info(f"Migrated {migrated_count} repositories to database")
+    
+    async def _load_repositories_from_database(self):
+        """Load existing repositories from database into cache"""
+        try:
+            db_repositories = await self.db_service.list_repositories()
+            for repository in db_repositories:
+                self.repositories[repository.id] = repository
+            
+            logger.info(f"Loaded {len(db_repositories)} repositories from database into cache")
+            
+        except Exception as e:
+            logger.error(f"Failed to load repositories from database: {e}")
+    
+    async def _ensure_initialized(self):
+        """Ensure the service is initialized before operations"""
+        if not self._initialized:
+            await self.initialize()
     
     async def clone_repository(self, repo_url: str, local_path: Optional[str] = None) -> Repository:
         """Clone a repository from URL"""
@@ -228,7 +291,15 @@ class RepositoryService:
             branch=branch
         )
         
-        # Store repository
+        # Save to database first
+        try:
+            await self.db_service.save_repository(repository)
+            logger.debug(f"Saved cloned repository {repo_id} to database")
+        except Exception as e:
+            logger.error(f"Failed to save cloned repository {repo_id} to database: {e}")
+            # Continue with in-memory storage
+        
+        # Store repository in cache
         self.repositories[repo_id] = repository
         return repository
     
@@ -312,6 +383,8 @@ class RepositoryService:
     
     async def scan_local_directory(self, path: str, url: Optional[str] = None) -> Repository:
         """Scan a local directory and create repository metadata"""
+        await self._ensure_initialized()
+        
         if not os.path.exists(path):
             raise FileNotFoundError(f"Directory not found: {path}")
         
@@ -337,22 +410,128 @@ class RepositoryService:
             size_bytes=size_bytes
         )
         
-        # Store repository
+        # Save to database first
+        try:
+            await self.db_service.save_repository(repository)
+            logger.debug(f"Saved repository {repo_id} to database")
+        except Exception as e:
+            logger.error(f"Failed to save repository {repo_id} to database: {e}")
+            # Continue with in-memory storage
+        
+        # Update cache
         self.repositories[repo_id] = repository
         
         return repository
     
     async def get_repository_metadata(self, repo_id: str) -> Optional[Repository]:
-        """Get repository metadata by ID"""
-        return self.repositories.get(repo_id)
+        """Get repository metadata with cache-first strategy"""
+        await self._ensure_initialized()
+        
+        # Try cache first
+        if repo_id in self.repositories:
+            logger.debug(f"Repository {repo_id} found in cache")
+            return self.repositories[repo_id]
+        
+        # Fallback to database
+        try:
+            repository = await self.db_service.get_repository(repo_id)
+            if repository:
+                # Update cache
+                self.repositories[repo_id] = repository
+                logger.debug(f"Repository {repo_id} loaded from database and cached")
+                return repository
+        except Exception as e:
+            logger.error(f"Failed to load repository {repo_id} from database: {e}")
+        
+        logger.debug(f"Repository {repo_id} not found")
+        return None
     
     async def list_repositories(self) -> List[Repository]:
-        """List all managed repositories"""
+        """List all managed repositories with database sync"""
+        await self._ensure_initialized()
+        
+        # If cache is empty, try to load from database
+        if not self.repositories:
+            try:
+                db_repositories = await self.db_service.list_repositories()
+                for repository in db_repositories:
+                    self.repositories[repository.id] = repository
+                logger.debug(f"Loaded {len(db_repositories)} repositories from database")
+            except Exception as e:
+                logger.error(f"Failed to load repositories from database: {e}")
+        
         return list(self.repositories.values())
+    
+    async def add_repository(self, repo_data: Dict[str, Any]) -> Repository:
+        """Add repository with database persistence"""
+        await self._ensure_initialized()
+        
+        repository = Repository(**repo_data)
+        
+        # Save to database first
+        try:
+            await self.db_service.save_repository(repository)
+            logger.debug(f"Saved repository {repository.id} to database")
+        except Exception as e:
+            logger.error(f"Failed to save repository {repository.id} to database: {e}")
+            # Continue with in-memory storage
+        
+        # Update cache
+        self.repositories[repository.id] = repository
+        
+        return repository
+    
+    async def update_repository(self, repo_id: str, updates: Dict[str, Any]) -> Optional[Repository]:
+        """Update repository with database persistence"""
+        await self._ensure_initialized()
+        
+        # Get existing repository
+        repository = await self.get_repository_metadata(repo_id)
+        if not repository:
+            return None
+        
+        # Apply updates
+        updated_data = repository.model_dump()
+        updated_data.update(updates)
+        updated_repository = Repository(**updated_data)
+        
+        # Save to database
+        try:
+            await self.db_service.save_repository(updated_repository)
+            logger.debug(f"Updated repository {repo_id} in database")
+        except Exception as e:
+            logger.error(f"Failed to update repository {repo_id} in database: {e}")
+            # Continue with in-memory storage
+        
+        # Update cache
+        self.repositories[repo_id] = updated_repository
+        
+        return updated_repository
+    
+    async def delete_repository(self, repo_id: str) -> bool:
+        """Delete repository from database and cache"""
+        await self._ensure_initialized()
+        
+        # Remove from database
+        try:
+            await self.db_service.delete_repository(repo_id)
+            logger.debug(f"Deleted repository {repo_id} from database")
+        except Exception as e:
+            logger.error(f"Failed to delete repository {repo_id} from database: {e}")
+        
+        # Remove from cache
+        if repo_id in self.repositories:
+            del self.repositories[repo_id]
+        
+        # Remove analysis if exists
+        if repo_id in self.analyses:
+            del self.analyses[repo_id]
+        
+        return True
     
     async def analyze_repository(self, repo_id: str) -> RepositoryAnalysis:
         """Perform complete analysis of a repository"""
-        repository = self.repositories.get(repo_id)
+        repository = await self.get_repository_metadata(repo_id)
         if not repository:
             raise ValueError(f"Repository not found: {repo_id}")
         
