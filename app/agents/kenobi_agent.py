@@ -1167,19 +1167,32 @@ Please provide a helpful, accurate response about the code. If you found relevan
 
 Keep your response conversational and helpful. Include specific file names and line numbers when referencing code."""
 
-            # Use the AI engine to generate response
-            analysis_request = AnalysisRequest(
-                content=prompt,
-                analysis_type=AnalysisType.CODE_EXPLANATION,
-                complexity=ModelComplexity.MEDIUM,
-                context={
-                    "repository_id": repository_id,
-                    "branch": branch,
-                    "user_message": message
-                }
-            )
-            
-            ai_response = await self.ai_engine.analyze(analysis_request)
+            # For chat responses, use a simpler approach
+            # Since we don't have a specific code element, use direct Ollama API
+            try:
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "http://localhost:11434/api/generate",
+                        json={
+                            "model": "llama3.2:1b",
+                            "prompt": prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.7,
+                                "max_tokens": 2000
+                            }
+                        },
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        ai_response = {"analysis": {"explanation": result.get("response", "I couldn't generate a response.")}}
+                    else:
+                        ai_response = {"analysis": {"explanation": "I'm having trouble connecting to the AI service. Please try again."}}
+            except Exception as e:
+                ai_response = {"analysis": {"explanation": f"I encountered an error: {str(e)}"}}
             
             response_text = ai_response.get('analysis', {}).get('explanation', 
                 "I'm sorry, I couldn't generate a response for your question. Please try rephrasing it or ask about specific code elements.")

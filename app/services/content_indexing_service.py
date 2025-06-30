@@ -24,7 +24,7 @@ from app.services.vector_database_service import (
 )
 from app.services.documentation_service import DocumentationService
 from app.services.analysis_service import AnalysisService
-from app.services.database_service import DatabaseService
+from app.services.database_service import database_service
 from app.models.repository_schemas import Repository, CodeElement
 from app.tools.code_parser import CodeParser
 
@@ -122,7 +122,7 @@ class ContentIndexingService:
         self.vector_db_service = VectorDatabaseService()
         self.documentation_service = DocumentationService()
         self.analysis_service = AnalysisService()
-        self.db_service = DatabaseService()
+        self.db_service = database_service
         self.code_parser = CodeParser()
         
         # Configuration

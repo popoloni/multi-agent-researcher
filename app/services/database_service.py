@@ -26,25 +26,35 @@ class DatabaseService:
         # Use SQLite for development, can be configured for PostgreSQL in production
         self.database_url = getattr(settings, 'DATABASE_URL', None) or "sqlite+aiosqlite:///./kenobi.db"
         
-        # Create async engine for database operations
-        self.engine = create_async_engine(
-            self.database_url,
-            echo=False,  # Set to True for SQL debugging
-            future=True
-        )
+        # Initialize engine and session factory as None for lazy loading
+        self.engine = None
+        self.session_factory = None
         
-        # Create session factory
-        self.session_factory = async_sessionmaker(
-            self.engine,
-            class_=AsyncSession,
-            expire_on_commit=False
-        )
-        
-        logger.info(f"Database service initialized with URL: {self.database_url}")
+        logger.info(f"Database service configured with URL: {self.database_url}")
+    
+    def _ensure_engine(self):
+        """Ensure the database engine and session factory are initialized"""
+        if self.engine is None:
+            # Create async engine for database operations
+            self.engine = create_async_engine(
+                self.database_url,
+                echo=False,  # Set to True for SQL debugging
+                future=True
+            )
+            
+            # Create session factory
+            self.session_factory = async_sessionmaker(
+                self.engine,
+                class_=AsyncSession,
+                expire_on_commit=False
+            )
+            
+            logger.info(f"Database engine initialized with URL: {self.database_url}")
     
     async def initialize(self):
         """Initialize database tables"""
         try:
+            self._ensure_engine()
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             logger.info("Database tables created successfully")
@@ -55,6 +65,7 @@ class DatabaseService:
     async def health_check(self):
         """Check database connectivity"""
         try:
+            self._ensure_engine()
             async with self.session_factory() as session:
                 await session.execute(text("SELECT 1"))
             return True
@@ -65,6 +76,7 @@ class DatabaseService:
     async def save_repository(self, repository: Repository) -> Repository:
         """Save repository with immediate cache update"""
         try:
+            self._ensure_engine()
             async with self.session_factory() as session:
                 # Convert enum values from schema to database enums
                 db_clone_status = DBCloneStatus.PENDING
@@ -128,6 +140,7 @@ class DatabaseService:
     async def get_repository(self, repo_id: str) -> Optional[Repository]:
         """Get repository from database"""
         try:
+            self._ensure_engine()
             async with self.session_factory() as session:
                 result = await session.execute(
                     select(DatabaseRepository).where(DatabaseRepository.id == repo_id)
@@ -191,6 +204,7 @@ class DatabaseService:
     async def list_repositories(self) -> List[Repository]:
         """List all repositories from database"""
         try:
+            self._ensure_engine()
             async with self.session_factory() as session:
                 result = await session.execute(select(DatabaseRepository))
                 db_repos = result.scalars().all()
@@ -251,6 +265,7 @@ class DatabaseService:
     async def delete_repository(self, repo_id: str) -> bool:
         """Delete repository from database"""
         try:
+            self._ensure_engine()
             async with self.session_factory() as session:
                 result = await session.execute(
                     select(DatabaseRepository).where(DatabaseRepository.id == repo_id)
@@ -272,6 +287,7 @@ class DatabaseService:
     async def save_documentation(self, repo_id: str, documentation_data: Dict[str, Any]) -> DatabaseDocumentation:
         """Save documentation to database"""
         try:
+            self._ensure_engine()
             async with self.session_factory() as session:
                 # Create documentation record
                 documentation = DatabaseDocumentation(
@@ -295,6 +311,7 @@ class DatabaseService:
     async def get_documentation(self, repo_id: str) -> Optional[Dict[str, Any]]:
         """Get latest documentation for repository"""
         try:
+            self._ensure_engine()
             async with self.session_factory() as session:
                 result = await session.execute(
                     select(DatabaseDocumentation)
@@ -317,6 +334,7 @@ class DatabaseService:
     async def get_connection_stats(self) -> Dict[str, Any]:
         """Get database connection statistics"""
         try:
+            self._ensure_engine()
             pool = self.engine.pool
             return {
                 "pool_size": getattr(pool, 'size', 'unknown'),
@@ -332,8 +350,9 @@ class DatabaseService:
     async def close(self):
         """Close database connections"""
         try:
-            await self.engine.dispose()
-            logger.info("Database connections closed")
+            if self.engine:
+                await self.engine.dispose()
+                logger.info("Database connections closed")
         except Exception as e:
             logger.error(f"Error closing database connections: {e}")
 

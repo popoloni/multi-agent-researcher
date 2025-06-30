@@ -425,28 +425,37 @@ If the context doesn't contain enough information to answer the question fully, 
     async def _generate_ai_response(self, prompt: str, query: str, repo_id: str) -> str:
         """Generate response using AI engine"""
         try:
-            # Create analysis request
-            analysis_request = AnalysisRequest(
-                analysis_type=AnalysisType.CODE_EXPLANATION,
-                code_element=None,  # Not needed for this use case
-                context={
-                    "repository_id": repo_id,
-                    "query": query,
-                    "prompt": prompt
-                },
-                complexity=ModelComplexity.MEDIUM,
-                streaming=False,
-                max_tokens=2000
-            )
+            # For now, use a simple approach since we don't have a specific code element
+            # This can be enhanced later with proper AI integration
             
-            # Generate response
-            ai_response = await self.ai_engine.analyze(analysis_request)
-            
-            # Extract response content
-            if ai_response and "analysis" in ai_response:
-                return ai_response["analysis"].get("explanation", "I couldn't generate a response for your question.")
-            else:
-                return "I couldn't generate a response for your question. Please try again or rephrase your query."
+            # Check if we have Ollama available
+            import httpx
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "http://localhost:11434/api/generate",
+                        json={
+                            "model": "llama3.2:1b",
+                            "prompt": prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.7,
+                                "max_tokens": 2000
+                            }
+                        },
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        return result.get("response", "I couldn't generate a response for your question.")
+                    else:
+                        logger.warning(f"Ollama API returned status {response.status_code}")
+                        return "I'm having trouble connecting to the AI service. Please try again."
+                        
+            except httpx.RequestError as e:
+                logger.warning(f"Failed to connect to Ollama: {e}")
+                return "I'm having trouble connecting to the AI service. Please try again."
             
         except Exception as e:
             logger.error(f"Failed to generate AI response: {e}")

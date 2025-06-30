@@ -13,7 +13,7 @@ from dataclasses import dataclass, asdict
 import json
 from sqlalchemy import text
 
-from app.services.database_service import DatabaseService
+from app.services.database_service import database_service
 from app.services.cache_service import cache_service
 from app.services.repository_service import RepositoryService
 from app.database.models import AnalysisResult
@@ -49,7 +49,7 @@ class AnalysisService:
     """Service for persisting and retrieving repository analysis results"""
     
     def __init__(self):
-        self.db_service = DatabaseService()
+        self.db_service = database_service
         self.cache_service = cache_service
         self.repository_service = RepositoryService()
         self.vector_service = VectorService()

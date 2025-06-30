@@ -164,16 +164,16 @@ const KenobiChat = () => {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col shadow-sm">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <Bot className="w-6 h-6 text-primary-500" />
-              <h1 className="text-xl font-bold">Kenobi Chat</h1>
+              <Bot className="w-6 h-6 text-blue-600" />
+              <h1 className="text-xl font-bold text-gray-900">Kenobi Chat</h1>
             </div>
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
               title="Settings"
             >
               <Settings className="w-5 h-5" />
@@ -339,10 +339,10 @@ const KenobiChat = () => {
                 <div className={`max-w-3xl flex space-x-3 ${
                   (message.role === 'user' || message.type === 'user') ? 'flex-row-reverse space-x-reverse' : ''
                 }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${
                     (message.role === 'user' || message.type === 'user')
-                      ? 'bg-primary-500 text-white' 
-                      : 'bg-gray-200 text-gray-600'
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-600'
                   }`}>
                     {(message.role === 'user' || message.type === 'user') ? (
                       <User className="w-4 h-4" />
@@ -350,9 +350,9 @@ const KenobiChat = () => {
                       <Bot className="w-4 h-4" />
                     )}
                   </div>
-                  <div className={`rounded-lg px-4 py-2 ${
+                  <div className={`rounded-lg px-4 py-3 shadow-sm ${
                     (message.role === 'user' || message.type === 'user')
-                      ? 'bg-primary-500 text-white'
+                      ? 'bg-blue-600 text-white'
                       : message.isError
                       ? 'bg-red-50 text-red-800 border border-red-200'
                       : 'bg-white text-gray-900 border border-gray-200'
@@ -382,14 +382,17 @@ const KenobiChat = () => {
           {isLoading && (
             <div className="flex justify-start">
               <div className="max-w-3xl flex space-x-3">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shadow-sm">
                   <Bot className="w-4 h-4 text-gray-600" />
                 </div>
-                <div className="bg-white border border-gray-200 rounded-lg px-4 py-2">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    </div>
+                    <span className="text-sm text-gray-500 ml-2">Kenobi is thinking...</span>
                   </div>
                 </div>
               </div>
@@ -400,8 +403,8 @@ const KenobiChat = () => {
         </div>
 
         {/* Message Input */}
-        <div className="border-t border-gray-200 p-4">
-          <div className="flex space-x-4">
+        <div className="border-t border-gray-200 p-4 bg-white">
+          <div className="flex space-x-3">
             <div className="flex-1">
               <textarea
                 value={inputMessage}
@@ -409,14 +412,14 @@ const KenobiChat = () => {
                 onKeyPress={handleKeyPress}
                 placeholder={selectedRepository ? "Ask Kenobi about your code..." : "Select a repository first..."}
                 disabled={!selectedRepository || isLoading}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
-                rows="3"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-sm transition-all"
+                rows="2"
               />
             </div>
             <button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || !selectedRepository || isLoading}
-              className="bg-primary-500 text-white px-6 py-3 rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors shadow-sm"
             >
               <Send className="w-4 h-4" />
               <span>Send</span>

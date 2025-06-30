@@ -15,7 +15,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import uuid
 
-from app.services.database_service import DatabaseService
+from app.services.database_service import database_service
 from app.engines.vector_service import VectorService, VectorDocument, SimilarityResult, EmbeddingModel
 from app.services.cache_service import cache_service
 from app.database.models import VectorIndex, VectorDocument as VectorDocumentModel
@@ -70,7 +70,7 @@ class VectorDatabaseService:
     """
     
     def __init__(self):
-        self.db_service = DatabaseService()
+        self.db_service = database_service
         self.vector_service = VectorService()
         self.cache_service = cache_service
         

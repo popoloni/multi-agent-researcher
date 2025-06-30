@@ -12,7 +12,7 @@ from datetime import datetime
 import json
 import uuid
 
-from app.services.database_service import DatabaseService
+from app.services.database_service import database_service
 from app.services.cache_service import cache_service
 from app.database.models import ChatConversation, ChatMessage
 from sqlalchemy import select, desc, text
@@ -34,7 +34,7 @@ class ChatHistoryService:
     """
     
     def __init__(self):
-        self.db_service = DatabaseService()
+        self.db_service = database_service
         self.cache_service = cache_service
         
         # Cache configuration

@@ -3142,7 +3142,7 @@ async def create_chat_session(
             raise HTTPException(status_code=404, detail="Repository not found")
         
         # Create new session
-        session_id = str(uuid.uuid4())
+        session_id = str(uuid4())
         
         # Initialize conversation
         conversation = await chat_history_service._get_or_create_conversation(
@@ -3161,6 +3161,38 @@ async def create_chat_session(
     except Exception as e:
         logger.error(f"Failed to create chat session: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create chat session: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/context")
+async def get_repository_context(repository_id: str, branch: str = "main") -> Dict[str, Any]:
+    """Get repository context for chat"""
+    try:
+        # Get repository details
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Get basic context information
+        context = {
+            "repository_id": repository_id,
+            "branch": branch,
+            "name": getattr(repository, "name", "Unknown"),
+            "description": getattr(repository, "description", ""),
+            "language": getattr(repository, "language", "Unknown").name if hasattr(getattr(repository, "language", "Unknown"), "name") else str(getattr(repository, "language", "Unknown")),
+            "framework": getattr(repository, "framework", "Unknown"),
+            "file_count": getattr(repository, "file_count", 0),
+            "line_count": getattr(repository, "total_lines", 0),
+            "languages": [getattr(repository, "language", "Unknown").name if hasattr(getattr(repository, "language", "Unknown"), "name") else str(getattr(repository, "language", "Unknown"))],
+            "indexed": True,  # If repository exists, it's indexed
+            "indexed_at": getattr(repository, "updated_at", None)
+        }
+        
+        return context
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get repository context: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get repository context: {str(e)}")
 
 @app.get("/kenobi/repositories/{repository_id}/branches")
 async def get_repository_branches(repository_id: str) -> Dict[str, Any]:

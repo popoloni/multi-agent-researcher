@@ -60,7 +60,13 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 - **🏗️ Multi-Agent Architecture** - Specialized agents for orchestration, analysis, and dependencies
 - **🎯 Complete Workflow** - GitHub search → clone → index → AI documentation → documentation-aware chat
 
-## 🎉 Latest Improvements (v1.2.0)
+## 🎉 Latest Improvements (v1.3.0)
+
+### 💬 Fully Functional Chat System
+- **AI-Powered Conversations**: Working chat interface with Ollama llama3.2:1b integration
+- **Repository Context Awareness**: Chat understands repository structure and answers code-specific questions
+- **Session Management**: Create and manage chat sessions with unique session IDs
+- **Modern UI**: Professional blue theme with enhanced message bubbles and loading animations
 
 ### 🚀 AI-Powered Documentation Generation
 - **Professional Content**: AI-generated descriptions using Ollama llama3.2:1b model
@@ -74,10 +80,10 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 - **Functional Buttons**: Eye button opens GitHub source code, doc button navigates to documentation
 - **Multiple Views**: Both hierarchical and flat view options
 
-### 🔧 Repository Management Improvements
+### 🔧 System Stability Improvements
+- **Database Architecture**: Fixed async SQLite driver issues and unified database connections
+- **Service Integration**: All services now work harmoniously with proper error handling
 - **Extended Timeouts**: 5-minute timeout for repository operations (cloning, parsing, AI analysis)
-- **Progress Tracking**: Step-by-step indicators for long-running operations
-- **Clean Path Display**: Removed temp folder prefixes throughout the UI
 - **Enhanced Error Handling**: User-friendly error messages with automatic clearing
 
 ## 📊 API Overview
@@ -150,6 +156,7 @@ services:
 - **[Interactive API Docs](http://localhost:12000/docs)** - Swagger UI with all 78+ endpoints
 - **[Frontend Dashboard](http://localhost:12001)** - Complete UI with AI documentation generation
 - **[Repository Management](http://localhost:12001/repositories)** - Clone, analyze, and manage repositories
+- **[Kenobi Chat](http://localhost:12001/chat)** - AI-powered chat about your codebase
 - **[Functionalities Registry](http://localhost:12001/repositories/{id}/functionalities)** - Hierarchical code exploration
 - **[Documentation Viewer](http://localhost:12001/repositories/{id}/documentation)** - AI-generated documentation
 
@@ -180,10 +187,12 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed information about recent improveme
 ## 🧪 Testing
 
 ### Verified Working Features
+- ✅ **Chat System**: AI-powered conversations with repository context awareness
 - ✅ **GitHub Integration**: Complete API with search, cloning, repository info
 - ✅ **AI Documentation**: Professional content generation with Ollama integration
 - ✅ **Repository Processing**: 5-minute timeout handling for complex repositories
 - ✅ **Functionalities Registry**: Hierarchical navigation with GitHub source links
+- ✅ **Database Operations**: Async SQLite with proper service integration
 - ✅ **Progress Tracking**: Real-time updates for long-running operations
 - ✅ **Error Handling**: User-friendly messages with automatic recovery
 

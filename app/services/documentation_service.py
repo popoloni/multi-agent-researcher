@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import logging
 from dataclasses import dataclass
 
-from app.services.database_service import DatabaseService
+from app.services.database_service import database_service
 from app.services.cache_service import cache_service
 from app.database.models import Documentation, Repository
 from app.engines.vector_service import VectorService
@@ -45,7 +45,7 @@ class DocumentationService:
     """
     
     def __init__(self):
-        self.db_service = DatabaseService()
+        self.db_service = database_service
         self.vector_service = VectorService()
         self.cache_service = cache_service
         self._cache_prefix = "doc:"
