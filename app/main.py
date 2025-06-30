@@ -4,7 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from typing import Dict, Any, List
+import time
+from typing import Dict, Any, List, Optional
 from uuid import UUID, uuid4
 import asyncio
 from datetime import datetime
@@ -19,9 +20,12 @@ from app.models.repository_schemas import (
     GitHubCloneRequest, GitHubSearchResponse, GitHubRepositoryInfo,
     GitHubBranch, CloneProgressUpdate
 )
+from app.models.rag_schemas import ChatRequest, ChatResponse
 from app.services.indexing_service import SearchFilters
 from app.services.research_service import ResearchService
 from app.services.github_service import github_service, GitHubService
+from app.services.rag_service import RAGService
+from app.services.chat_history_service import ChatHistoryService
 from app.core.config import settings
 import logging
 
@@ -132,6 +136,15 @@ async def startup_event():
         print("✅ Cache service initialized")
     except Exception as e:
         print(f"⚠️  Cache service initialization failed: {e}")
+        
+    # Initialize RAG and chat history services
+    try:
+        global rag_service, chat_history_service
+        rag_service = RAGService()
+        chat_history_service = ChatHistoryService()
+        print("✅ RAG and chat history services initialized")
+    except Exception as e:
+        print(f"⚠️  RAG and chat history services initialization failed: {e}")
     
     # Initialize documentation service
     try:
@@ -2845,13 +2858,15 @@ async def generate_repository_insights(repository_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Insight generation failed: {str(e)}")
 
 # Chat endpoints
+# Legacy chat endpoint (maintained for backward compatibility)
 @app.post("/kenobi/chat")
 async def kenobi_chat(request: Dict[str, Any]) -> Dict[str, Any]:
-    """Chat with Kenobi about repository code"""
+    """Chat with Kenobi about repository code (legacy endpoint)"""
     try:
         message = request.get("message", "")
         repository_id = request.get("repository_id", "")
         branch = request.get("branch", "main")
+        session_id = request.get("session_id")
         
         if not message or not repository_id:
             raise HTTPException(status_code=400, detail="Message and repository_id are required")
@@ -2861,54 +2876,291 @@ async def kenobi_chat(request: Dict[str, Any]) -> Dict[str, Any]:
         if not repository:
             raise HTTPException(status_code=404, detail="Repository not found")
         
+        # Save user message to history
+        if session_id:
+            await chat_history_service.save_message(
+                repository_id=repository_id,
+                message=message,
+                is_user=True,
+                session_id=session_id,
+                branch=branch
+            )
+        
         # Generate response using Kenobi
         response = await kenobi_agent.chat_about_repository(message, repository_id, branch)
+        
+        # Save assistant response to history
+        if session_id:
+            await chat_history_service.save_message(
+                repository_id=repository_id,
+                message=response.get("answer", ""),
+                is_user=False,
+                session_id=session_id,
+                branch=branch,
+                metadata={"sources": response.get("sources", [])}
+            )
         
         return {
             "response": response.get("answer", "I couldn't generate a response for your question."),
             "sources": response.get("sources", []),
             "repository_id": repository_id,
             "branch": branch,
+            "session_id": session_id,
             "timestamp": response.get("timestamp")
         }
         
     except Exception as e:
+        logger.error(f"Legacy chat failed: {e}")
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
-@app.get("/kenobi/chat/history")
-async def get_chat_history(repository_id: str, branch: str = "main") -> Dict[str, Any]:
-    """Get chat history for a repository"""
+
+# Enhanced chat API with RAG integration
+@app.post("/chat/repository/{repo_id}")
+async def enhanced_chat_about_repository(
+    repo_id: str,
+    request: ChatRequest,
+    session_id: Optional[str] = None,
+    branch: str = "main",
+    use_rag: bool = True,
+    include_context: bool = True
+) -> ChatResponse:
+    """
+    Enhanced chat with RAG capabilities and fallback
+    
+    Args:
+        repo_id: Repository identifier
+        request: Chat request with message and optional context
+        session_id: Optional session identifier for conversation history
+        branch: Repository branch
+        use_rag: Whether to use RAG for response generation
+        include_context: Whether to include conversation history as context
+        
+    Returns:
+        Chat response with sources and context information
+    """
+    start_time = time.time()
+    
     try:
-        # For now, return empty history - this would be implemented with a chat history service
-        return {
-            "messages": [],
-            "repository_id": repository_id,
-            "branch": branch
-        }
+        # Verify repository exists
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Save user message to history
+        if session_id:
+            await chat_history_service.save_message(
+                repository_id=repo_id,
+                message=request.message,
+                is_user=True,
+                session_id=session_id,
+                branch=branch
+            )
+        
+        # Get conversation history for context if needed
+        context = request.context or {}
+        if include_context and session_id:
+            conversation_context = await chat_history_service.get_context_for_rag(
+                repository_id=repo_id,
+                session_id=session_id,
+                branch=branch
+            )
+            context.update(conversation_context)
+        
+        # Generate response
+        try:
+            if use_rag:
+                # Use RAG service for intelligent response
+                rag_response = await rag_service.generate_response(
+                    query=request.message,
+                    repo_id=repo_id,
+                    context=context
+                )
+                
+                response_content = rag_response.content
+                sources = rag_response.sources
+                context_used = rag_response.context_used
+                
+                # Log performance metrics
+                logger.info(f"RAG response generated in {rag_response.processing_time:.3f}s")
+                
+            else:
+                # Fallback to existing chat functionality
+                kenobi_response = await kenobi_agent.chat_about_repository(
+                    request.message, 
+                    repo_id, 
+                    branch
+                )
+                
+                response_content = kenobi_response.get("answer", "I couldn't generate a response.")
+                sources = kenobi_response.get("sources", [])
+                context_used = False
+                
+        except Exception as e:
+            # Graceful fallback to existing chat
+            logger.warning(f"RAG chat failed, falling back to basic chat: {e}")
+            kenobi_response = await kenobi_agent.chat_about_repository(
+                request.message, 
+                repo_id, 
+                branch
+            )
+            
+            response_content = kenobi_response.get("answer", "I couldn't generate a response.")
+            sources = kenobi_response.get("sources", [])
+            context_used = False
+        
+        # Save assistant response to history
+        if session_id:
+            await chat_history_service.save_message(
+                repository_id=repo_id,
+                message=response_content,
+                is_user=False,
+                session_id=session_id,
+                branch=branch,
+                metadata={"sources": sources}
+            )
+        
+        # Calculate processing time
+        processing_time = time.time() - start_time
+        
+        # Create response
+        chat_response = ChatResponse(
+            response=response_content,
+            sources=sources,
+            context_used=context_used,
+            timestamp=datetime.utcnow(),
+            repository_id=repo_id,
+            branch=branch
+        )
+        
+        logger.info(f"Chat response generated in {processing_time:.3f}s")
+        return chat_response
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Enhanced chat failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+
+@app.get("/chat/repository/{repo_id}/history")
+async def get_enhanced_chat_history(
+    repo_id: str,
+    session_id: Optional[str] = None,
+    branch: str = "main",
+    limit: int = 50
+) -> Dict[str, Any]:
+    """
+    Get chat history for a repository
+    
+    Args:
+        repo_id: Repository identifier
+        session_id: Optional session identifier
+        branch: Repository branch
+        limit: Maximum number of messages to return
+        
+    Returns:
+        Chat history data
+    """
+    try:
+        # Get repository context
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Get chat history
+        history = await chat_history_service.get_conversation_history(
+            repository_id=repo_id,
+            session_id=session_id,
+            branch=branch,
+            limit=limit
+        )
+        
+        return history
         
     except Exception as e:
+        logger.error(f"Failed to get chat history: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get chat history: {str(e)}")
 
-@app.delete("/kenobi/chat/history")
-async def clear_chat_history(request: Dict[str, Any]) -> Dict[str, Any]:
-    """Clear chat history for a repository"""
+
+@app.delete("/chat/repository/{repo_id}/history")
+async def clear_enhanced_chat_history(
+    repo_id: str,
+    session_id: Optional[str] = None,
+    branch: str = "main"
+) -> Dict[str, Any]:
+    """
+    Clear chat history for a repository
+    
+    Args:
+        repo_id: Repository identifier
+        session_id: Optional session identifier (if None, clears all conversations)
+        branch: Repository branch
+        
+    Returns:
+        Status of the operation
+    """
     try:
-        repository_id = request.get("repository_id", "")
-        branch = request.get("branch", "main")
+        # Get repository context
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
         
-        if not repository_id:
-            raise HTTPException(status_code=400, detail="repository_id is required")
+        # Clear chat history
+        result = await chat_history_service.clear_conversation_history(
+            repository_id=repo_id,
+            session_id=session_id,
+            branch=branch
+        )
         
-        # For now, just return success - this would be implemented with a chat history service
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to clear chat history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear chat history: {str(e)}")
+
+
+@app.post("/chat/repository/{repo_id}/session")
+async def create_chat_session(
+    repo_id: str,
+    branch: str = "main"
+) -> Dict[str, Any]:
+    """
+    Create a new chat session for a repository
+    
+    Args:
+        repo_id: Repository identifier
+        branch: Repository branch
+        
+    Returns:
+        Session information
+    """
+    try:
+        # Get repository context
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Create new session
+        session_id = str(uuid.uuid4())
+        
+        # Initialize conversation
+        conversation = await chat_history_service._get_or_create_conversation(
+            repository_id=repo_id,
+            session_id=session_id,
+            branch=branch
+        )
+        
         return {
-            "success": True,
-            "message": "Chat history cleared",
-            "repository_id": repository_id,
-            "branch": branch
+            "session_id": session_id,
+            "repository_id": repo_id,
+            "branch": branch,
+            "created_at": conversation["created_at"]
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to clear chat history: {str(e)}")
+        logger.error(f"Failed to create chat session: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create chat session: {str(e)}")
 
 @app.get("/kenobi/repositories/{repository_id}/branches")
 async def get_repository_branches(repository_id: str) -> Dict[str, Any]:

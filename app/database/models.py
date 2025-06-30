@@ -84,12 +84,28 @@ class ChatConversation(Base):
     
     id = Column(String, primary_key=True)
     repository_id = Column(String, ForeignKey("repositories.id"))
-    messages = Column(JSON)
+    session_id = Column(String, nullable=False)
+    branch = Column(String, default="main")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     repository = relationship("Repository", back_populates="chat_conversations")
+    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(String, primary_key=True)
+    conversation_id = Column(String, ForeignKey("chat_conversations.id"))
+    content = Column(Text, nullable=False)
+    role = Column(String, default="user")  # user or assistant
+    metadata_json = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    conversation = relationship("ChatConversation", back_populates="messages")
 
 class VectorDocument(Base):
     __tablename__ = "vector_documents"

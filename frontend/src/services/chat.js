@@ -1,33 +1,73 @@
 import api from './api';
 
 export const chatService = {
-  // Send a message to Kenobi
-  sendMessage: async (message, repositoryId, branch = 'main') => {
-    const response = await api.post('/kenobi/chat', {
-      message,
-      repository_id: repositoryId,
-      branch
-    });
+  // Send a message to Kenobi (legacy endpoint)
+  sendLegacyMessage: async (messageData) => {
+    const response = await api.post('/kenobi/chat', messageData);
     return response.data;
+  },
+
+  // Enhanced chat with RAG capabilities
+  sendMessage: async (messageData, options = {}) => {
+    const { 
+      repositoryId, 
+      message, 
+      context = {}, 
+      sessionId = null, 
+      branch = 'main', 
+      useRag = true, 
+      includeContext = true 
+    } = messageData;
+
+    // Use enhanced chat API endpoint
+    const response = await api.post(`/chat/repository/${repositoryId}`, 
+      { message, context },
+      { 
+        params: { 
+          session_id: sessionId, 
+          branch, 
+          use_rag: useRag, 
+          include_context: includeContext 
+        } 
+      }
+    );
+    return response;
   },
 
   // Get chat history
-  getChatHistory: async (repositoryId, branch = 'main') => {
-    const response = await api.get('/kenobi/chat/history', {
-      params: { repository_id: repositoryId, branch }
+  getChatHistory: async (repositoryId, sessionId = null, branch = 'main', limit = 50) => {
+    // Use enhanced chat history endpoint
+    const response = await api.get(`/chat/repository/${repositoryId}/history`, {
+      params: { 
+        session_id: sessionId, 
+        branch,
+        limit
+      }
     });
-    return response.data;
+    return response;
   },
 
   // Clear chat history
-  clearChatHistory: async (repositoryId, branch = 'main') => {
-    const response = await api.delete('/kenobi/chat/history', {
-      data: { repository_id: repositoryId, branch }
+  clearChatHistory: async (repositoryId, sessionId = null, branch = 'main') => {
+    // Use enhanced clear history endpoint
+    const response = await api.delete(`/chat/repository/${repositoryId}/history`, {
+      params: { 
+        session_id: sessionId, 
+        branch 
+      }
     });
-    return response.data;
+    return response;
   },
 
-  // Get chat sessions
+  // Create a new chat session
+  createChatSession: async (repositoryId, branch = 'main') => {
+    const response = await api.post(`/chat/repository/${repositoryId}/session`, null, {
+      params: { branch }
+    });
+    return response;
+  },
+
+  // Get chat sessions (legacy)
   getChatSessions: async () => {
     const response = await api.get('/kenobi/chat/sessions');
     return response.data;
