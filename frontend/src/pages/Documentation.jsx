@@ -9,12 +9,20 @@ import DocumentationSearch from '../components/documentation/DocumentationSearch
 import DocumentationStatus from '../components/common/DocumentationStatus';
 import { repositoryService } from '../services/repositories';
 import { documentationService } from '../services/documentation';
+import { useDocumentation } from '../contexts/DocumentationContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/common/Tabs';
 
 const Documentation = () => {
   const { repositoryId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Use documentation context
+  const { 
+    getDocumentation, 
+    setDocumentation: setContextDocumentation, 
+    getCachedDocumentation 
+  } = useDocumentation();
   
   // Get docType from URL query params
   const queryParams = new URLSearchParams(location.search);
@@ -28,7 +36,7 @@ const Documentation = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('view'); // 'view', 'search', 'functionalities'
   
-  // Documentation state
+  // Documentation state - now managed by context
   const [documentation, setDocumentation] = useState({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -42,7 +50,7 @@ const Documentation = () => {
   useEffect(() => {
     if (repositoryId) {
       loadRepositoryDetails();
-      loadDocumentation();
+      loadDocumentationFromContext();
     }
   }, [repositoryId, selectedBranch]);
 
@@ -50,7 +58,7 @@ const Documentation = () => {
   useEffect(() => {
     const handleFocus = () => {
       if (repositoryId && docStatus === 'generated') {
-        loadDocumentation();
+        loadDocumentationFromContext();
       }
     };
 
@@ -61,7 +69,7 @@ const Documentation = () => {
   // Handle tab changes
   useEffect(() => {
     if (activeTab === 'view' && docStatus === 'generated') {
-      loadDocumentation();
+      loadDocumentationFromContext();
     }
   }, [activeTab]);
 
@@ -89,38 +97,40 @@ const Documentation = () => {
     }
   };
 
-  // Load documentation - SIMPLE AND RELIABLE
-  const loadDocumentation = async () => {
+  // Load documentation from context - PERSISTENT AND RELIABLE
+  const loadDocumentationFromContext = async () => {
     if (!repositoryId) return;
     
     try {
-      console.log('Loading documentation for:', repositoryId);
+      console.log('Loading documentation from context for:', repositoryId);
       
-      const response = await documentationService.getDocumentation(repositoryId, selectedBranch);
+      // First check if we have cached documentation
+      const cached = getCachedDocumentation(repositoryId, selectedBranch);
+      if (cached && cached.documentation && Object.keys(cached.documentation).length > 0) {
+        console.log('Found cached documentation in context');
+        setDocumentation(cached.documentation);
+        setDocStatus(cached.status);
+        setLastGenerated(cached.lastGenerated);
+        loadFunctionalities();
+        return;
+      }
       
-      if (response.data && response.data.documentation) {
-        const docData = response.data.documentation;
-        
-        console.log('Documentation data received:', docData);
-        
-        if (docData && Object.keys(docData).length > 0) {
-          setDocumentation(docData);
-          setDocStatus('generated');
-          setLastGenerated(response.data.last_generated || new Date().toISOString());
-          loadFunctionalities();
-          console.log('Documentation set successfully');
-        } else {
-          setDocStatus('not_generated');
-          setDocumentation({});
-          console.log('No documentation content found');
-        }
+      // If no cache, fetch from API via context
+      const result = await getDocumentation(repositoryId, selectedBranch);
+      
+      if (result && result.documentation && Object.keys(result.documentation).length > 0) {
+        console.log('Documentation loaded from API via context');
+        setDocumentation(result.documentation);
+        setDocStatus(result.status);
+        setLastGenerated(result.lastGenerated);
+        loadFunctionalities();
       } else {
+        console.log('No documentation found');
         setDocStatus('not_generated');
         setDocumentation({});
-        console.log('No documentation response');
       }
     } catch (err) {
-      console.error('Error loading documentation:', err);
+      console.error('Error loading documentation from context:', err);
       setDocStatus('not_generated');
       setDocumentation({});
     }
@@ -179,20 +189,20 @@ const Documentation = () => {
           }
         }
         
-        // Set the documentation
+        // Set the documentation in context and local state
         setDocumentation(docData);
         setDocStatus('generated');
         setLastGenerated(new Date().toISOString());
         
-        // Cache it
-        documentationService.setCache(repository.id, docData);
+        // Cache it in context (this will also update the service cache)
+        setContextDocumentation(repository.id, selectedBranch, docData);
         console.log('Documentation generated and cached successfully');
         
         // Load functionalities
         await loadFunctionalities();
       } else {
         console.log('No documentation in result, loading from API');
-        await loadDocumentation();
+        await loadDocumentationFromContext();
       }
       
     } catch (error) {

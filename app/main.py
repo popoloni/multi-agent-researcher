@@ -1906,8 +1906,18 @@ async def get_documentation(repository_id: str, branch: str = "main") -> Dict[st
         doc_result = await documentation_service.get_documentation(repository_id, branch)
 
         if doc_result and doc_result.documentation:
+            # Parse JSON content if it's stored as JSON string
+            documentation_content = doc_result.documentation.content
+            try:
+                import json
+                if isinstance(documentation_content, str):
+                    documentation_content = json.loads(documentation_content)
+            except (json.JSONDecodeError, TypeError):
+                # If parsing fails, keep as string
+                pass
+                
             return {
-                "documentation": doc_result.documentation.content,
+                "documentation": documentation_content,
                 "repository_id": repository_id,
                 "branch": branch,
                 "status": "generated",

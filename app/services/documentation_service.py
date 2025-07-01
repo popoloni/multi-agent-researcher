@@ -329,17 +329,25 @@ class DocumentationService:
     
     def _extract_content(self, documentation_data: Dict[str, Any]) -> str:
         """Extract text content from documentation data"""
+        import json
+        
         if isinstance(documentation_data, str):
             return documentation_data
         
         # Handle different data formats
         if "documentation" in documentation_data:
-            return str(documentation_data["documentation"])
+            doc_content = documentation_data["documentation"]
+            if isinstance(doc_content, dict):
+                return json.dumps(doc_content, indent=2)
+            return str(doc_content)
         elif "content" in documentation_data:
-            return str(documentation_data["content"])
+            content = documentation_data["content"]
+            if isinstance(content, dict):
+                return json.dumps(content, indent=2)
+            return str(content)
         else:
-            # Convert entire dict to string as fallback
-            return str(documentation_data)
+            # Convert entire dict to JSON as fallback
+            return json.dumps(documentation_data, indent=2)
     
     def _prepare_text_chunks(
         self, 
