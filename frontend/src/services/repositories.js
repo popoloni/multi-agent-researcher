@@ -4,25 +4,16 @@ import api from './api';
 export const cleanRepositoryPath = (path) => {
   if (!path) return path;
   
-  // Common temp directory patterns to remove
-  const tempPrefixes = [
-    '/tmp/kenobi/',
-    '/tmp/kenobi_repos/',
-    '/tmp/kenobi_repositories/',
-    '/var/tmp/kenobi/',
-    '/private/tmp/kenobi/',
-    '/private/tmp/kenobi_repos/',
-  ];
+  // Extract just the repository name from the full path
+  const parts = path.split('/');
+  const repoName = parts[parts.length - 1];
   
-  // Remove temp prefixes
-  for (const prefix of tempPrefixes) {
-    if (path.startsWith(prefix)) {
-      return path.substring(prefix.length);
-    }
-  }
-  
-  // If no temp prefix found, return original path
-  return path;
+  return repoName;
+};
+
+// Get the full debug path for display in debug view
+export const getDebugPath = (path) => {
+  return path || 'N/A';
 };
 
 /* 

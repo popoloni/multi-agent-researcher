@@ -3,7 +3,7 @@ import { Plus, Search, Trash2, Eye, FileText, ExternalLink, GitBranch } from 'lu
 import { Link } from 'react-router-dom';
 import RepositoryForm from './RepositoryForm';
 import StatusBadge from '../common/StatusBadge';
-import { repositoryService, cleanRepositoryPath } from '../../services/repositories';
+import { repositoryService, cleanRepositoryPath, getDebugPath } from '../../services/repositories';
 
 const RepositoryList = ({ repositories, onAddRepository, onDeleteRepository, isLoading }) => {
   const [showAddForm, setShowAddForm] = useState(false);
@@ -128,6 +128,7 @@ const RepositoryList = ({ repositories, onAddRepository, onDeleteRepository, isL
 
 const RepositoryRow = ({ repository, onDelete }) => {
   const [isSelected, setIsSelected] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   
   return (
     <div 
@@ -136,7 +137,7 @@ const RepositoryRow = ({ repository, onDelete }) => {
       }`}
     >
       <div className="col-span-3">
-        <div className="font-medium">{repository.name}</div>
+        <div className="font-medium">{cleanRepositoryPath(repository.name)}</div>
         {repository.branch && (
           <div className="flex items-center text-sm text-gray-500 mt-1">
             <GitBranch className="w-3 h-3 mr-1" />
@@ -144,8 +145,19 @@ const RepositoryRow = ({ repository, onDelete }) => {
           </div>
         )}
       </div>
-      <div className="col-span-4 text-gray-600 truncate">
-        {cleanRepositoryPath(repository.path || repository.url) || 'N/A'}
+      <div className="col-span-4 text-gray-600">
+        {cleanRepositoryPath(repository.path || repository.url)}
+        <button 
+          onClick={() => setShowDebug(!showDebug)}
+          className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+        >
+          {showDebug ? 'Hide Debug' : 'Show Debug'}
+        </button>
+        {showDebug && (
+          <div className="mt-1 text-xs text-gray-500 break-all">
+            Full path: {getDebugPath(repository.path)}
+          </div>
+        )}
       </div>
       <div className="col-span-2">
         <StatusBadge status={repository.status || 'indexed'} />

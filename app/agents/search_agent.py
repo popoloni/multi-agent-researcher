@@ -23,8 +23,8 @@ class SearchSubAgent(BaseAgent):
     def get_system_prompt(self) -> str:
         return SEARCH_SUBAGENT_PROMPT
         
-    async def execute_task(self, task: SubAgentTask) -> SubAgentResult:
-        """Execute the assigned research task"""
+    async def execute_task(self, task: SubAgentTask, progress_callback=None) -> SubAgentResult:
+        """Execute the assigned research task with real-time progress reporting"""
         
         # Think about approach
         thinking = await self.think(
@@ -35,7 +35,10 @@ class SearchSubAgent(BaseAgent):
         all_results = []
         findings = []
         
-        for step in thinking.get("steps", [])[:task.max_searches]:
+        steps = thinking.get("steps", [])[:task.max_searches]
+        total_steps = len(steps) if steps else 1
+        for i, step in enumerate(steps):
+            step_num = i + 1
             # Generate search query
             query = await self._generate_search_query(
                 task.objective, 
@@ -64,12 +67,21 @@ class SearchSubAgent(BaseAgent):
             
             findings.extend(extracted)
             
+            # Report progress
+            if progress_callback:
+                percent = int((step_num / total_steps) * 100)
+                current_task = f"Searching: {task.objective[:60]}... (step {step_num}/{total_steps})"
+                await progress_callback(percent, current_task)
+            
             # Check if we have enough information
             if await self._has_sufficient_information(findings, task.objective):
                 break
                 
         # Summarize findings
         summary = await self._summarize_findings(findings, task.objective)
+        
+        if progress_callback:
+            await progress_callback(100, f"Completed: {task.objective[:60]}...")
         
         return SubAgentResult(
             task_id=self.task_id,

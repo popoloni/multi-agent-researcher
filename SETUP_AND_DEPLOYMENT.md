@@ -410,6 +410,106 @@ DATABASE_URL=sqlite:///./kenobi.db
 LOG_LEVEL=INFO
 ```
 
+### 🤖 AI Model Configuration
+
+The system supports multiple AI providers with flexible model selection for different components:
+
+#### **Available Providers**
+- **Anthropic Claude**: High-quality cloud models (requires API key)
+- **Ollama**: Local models (free, but requires local resources)
+
+#### **Model Configuration Variables**
+
+```bash
+# === ANTHROPIC CONFIGURATION ===
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# === RESEARCH AGENTS ===
+LEAD_AGENT_MODEL=claude-4-sonnet-20241120          # Lead research planning
+SUBAGENT_MODEL=claude-4-sonnet-20241120            # Sub-research execution
+CITATION_MODEL=claude-3-5-haiku-20241022           # Citation generation
+
+# === KENOBI CHAT & CODE ANALYSIS ===
+KENOBI_MODEL=claude-4-sonnet-20241120              # Code analysis & chat
+
+# === DOCUMENTATION GENERATION ===
+DOCUMENTATION_MODEL=claude-4-sonnet-20241120       # Documentation generation
+
+# === GOOGLE SEARCH (for research functionality) ===
+GOOGLE_API_KEY=your_google_api_key_here
+GOOGLE_CSE_ID=your_cse_id_here
+```
+
+#### **Available Models**
+
+**Anthropic Claude Models:**
+- `claude-4-opus-20241120` - Highest performance, most expensive
+- `claude-4-sonnet-20241120` - Balanced performance/cost (recommended)
+- `claude-3-5-sonnet-20241022` - Good performance, lower cost
+- `claude-3-5-haiku-20241022` - Fast, cost-effective for simple tasks
+
+**Ollama Local Models:**
+- `llama3.1:70b` - Highest quality (requires 40GB RAM)
+- `llama3.1:8b` - Good balance (requires 8GB RAM)
+- `mistral:7b` - Efficient alternative
+- `llama3.2:3b` - Lightweight option
+- `llama3.2:1b` - Ultra-lightweight (default)
+
+#### **Configuration Examples**
+
+**High-Performance Setup (Best Quality)**
+```bash
+LEAD_AGENT_MODEL=claude-4-opus-20241120
+SUBAGENT_MODEL=claude-4-sonnet-20241120
+CITATION_MODEL=claude-3-5-haiku-20241022
+KENOBI_MODEL=claude-4-sonnet-20241120
+DOCUMENTATION_MODEL=claude-4-sonnet-20241120
+```
+
+**Balanced Setup (Recommended)**
+```bash
+LEAD_AGENT_MODEL=claude-4-sonnet-20241120
+SUBAGENT_MODEL=claude-4-sonnet-20241120
+CITATION_MODEL=claude-3-5-haiku-20241022
+KENOBI_MODEL=claude-3-5-sonnet-20241022
+DOCUMENTATION_MODEL=claude-3-5-sonnet-20241022
+```
+
+**Local-Only Setup (No API Costs)**
+```bash
+LEAD_AGENT_MODEL=llama3.1:8b
+SUBAGENT_MODEL=mistral:7b
+CITATION_MODEL=llama3.2:3b
+KENOBI_MODEL=llama3.1:8b
+DOCUMENTATION_MODEL=llama3.1:8b
+```
+
+**Hybrid Setup (Best of Both)**
+```bash
+LEAD_AGENT_MODEL=claude-4-sonnet-20241120
+SUBAGENT_MODEL=llama3.1:8b
+CITATION_MODEL=llama3.2:3b
+KENOBI_MODEL=claude-4-sonnet-20241120
+DOCUMENTATION_MODEL=claude-3-5-sonnet-20241022
+```
+
+#### **How to Configure Models**
+
+1. **Edit your `.env` file** with your preferred models
+2. **Restart the system**: `./start_all.sh restart`
+3. **Test the configuration** by running research or chat
+
+#### **Model Selection Guidelines**
+
+| Use Case | Recommended Setup | Reasoning |
+|----------|-------------------|-----------|
+| **Production Research** | High-Performance | Best quality results |
+| **Development/Testing** | Balanced | Good quality, reasonable cost |
+| **Experimentation** | Local-Only | No API costs, unlimited usage |
+| **Budget-Conscious** | Local-Only or Hybrid | Minimal or controlled costs |
+
+> **💡 Tip**: Start with the **Balanced Setup** and adjust based on your quality requirements and budget.
+
 ### Custom Ports
 
 To use different ports:

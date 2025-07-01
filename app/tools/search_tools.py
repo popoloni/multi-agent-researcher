@@ -15,29 +15,36 @@ class WebSearchTool:
         
     async def search(self, query: str) -> List[SearchResult]:
         """
-        Perform a web search and return results
-        
-        Note: This is a mock implementation. In production, you would:
-        1. Use a real search API (Google, Bing, etc.)
-        2. Implement proper rate limiting
-        3. Handle API errors gracefully
+        Perform a web search using Google Custom Search API and return results
         """
-        
-        # Mock search results for demonstration
-        # In production, replace with actual API calls
-        mock_results = await self._mock_search(query)
-        
-        # Process results in parallel
-        tasks = [self._fetch_content(result) for result in mock_results]
-        enriched_results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Filter out failed fetches
-        valid_results = [
-            r for r in enriched_results 
-            if isinstance(r, SearchResult)
-        ]
-        
-        return valid_results
+        if not settings.GOOGLE_API_KEY or not settings.GOOGLE_CSE_ID:
+            raise RuntimeError("Google API key and CSE ID must be set in environment variables.")
+
+        url = "https://www.googleapis.com/customsearch/v1"
+        params = {
+            "key": settings.GOOGLE_API_KEY,
+            "cx": settings.GOOGLE_CSE_ID,
+            "q": query,
+            "num": 5
+        }
+        try:
+            response = await self.client.get(url, params=params)
+            data = response.json()
+            if "error" in data:
+                raise RuntimeError(f"Google Search API error: {data['error'].get('message', 'Unknown error')}")
+            results = []
+            for item in data.get("items", []):
+                results.append(SearchResult(
+                    url=item.get("link", ""),
+                    title=item.get("title", ""),
+                    snippet=item.get("snippet", ""),
+                    content=None,
+                    relevance_score=0.8  # Placeholder, can be improved
+                ))
+            return results
+        except Exception as e:
+            print(f"Error during Google search: {e}")
+            return []
         
     async def _mock_search(self, query: str) -> List[Dict[str, Any]]:
         """Mock search function for demonstration"""

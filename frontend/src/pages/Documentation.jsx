@@ -38,14 +38,32 @@ const Documentation = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
-  // Load repository and documentation on mount
+  // Load repository and documentation on mount and when branch changes
   useEffect(() => {
     if (repositoryId) {
       loadRepositoryDetails();
       loadDocumentation();
-      loadFunctionalities();
     }
   }, [repositoryId, selectedBranch]);
+
+  // Load documentation when returning to the page
+  useEffect(() => {
+    const handleFocus = () => {
+      if (repositoryId && docStatus === 'generated') {
+        loadDocumentation();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [repositoryId, docStatus]);
+
+  // Handle tab changes
+  useEffect(() => {
+    if (activeTab === 'view' && docStatus === 'generated') {
+      loadDocumentation();
+    }
+  }, [activeTab]);
 
   // Update URL when doc type changes
   useEffect(() => {
@@ -71,21 +89,35 @@ const Documentation = () => {
     }
   };
 
-  // Load documentation
+  // Load documentation - SIMPLE AND RELIABLE
   const loadDocumentation = async () => {
     if (!repositoryId) return;
     
     try {
-      // Get all documentation types
+      console.log('Loading documentation for:', repositoryId);
+      
       const response = await documentationService.getDocumentation(repositoryId, selectedBranch);
       
       if (response.data && response.data.documentation) {
-        setDocumentation(response.data.documentation);
-        setDocStatus('generated');
-        setLastGenerated(response.data.last_generated || new Date().toISOString());
+        const docData = response.data.documentation;
+        
+        console.log('Documentation data received:', docData);
+        
+        if (docData && Object.keys(docData).length > 0) {
+          setDocumentation(docData);
+          setDocStatus('generated');
+          setLastGenerated(response.data.last_generated || new Date().toISOString());
+          loadFunctionalities();
+          console.log('Documentation set successfully');
+        } else {
+          setDocStatus('not_generated');
+          setDocumentation({});
+          console.log('No documentation content found');
+        }
       } else {
         setDocStatus('not_generated');
         setDocumentation({});
+        console.log('No documentation response');
       }
     } catch (err) {
       console.error('Error loading documentation:', err);
@@ -105,7 +137,7 @@ const Documentation = () => {
     }
   };
 
-  // Handle async documentation generation
+  // Handle documentation generation - SIMPLE AND RELIABLE
   const handleGenerateDocumentation = async (options = {}) => {
     if (!repository || !repository.id) return;
     
@@ -115,7 +147,8 @@ const Documentation = () => {
     setGenerationStage('Initializing...');
     
     try {
-      // Start async documentation generation
+      console.log('Starting documentation generation for:', repository.id);
+      
       const response = await documentationService.generateDocumentation(repository.id, {
         branch: selectedBranch,
         ...options
@@ -123,7 +156,6 @@ const Documentation = () => {
       
       const taskId = response.data.task_id;
       
-      // Poll for progress updates
       const result = await documentationService.pollDocumentationStatus(
         repository.id,
         taskId,
@@ -133,14 +165,34 @@ const Documentation = () => {
         }
       );
       
-      // Generation completed successfully
+      console.log('Generation completed:', result);
+      
       if (result.documentation) {
-        setDocumentation(result.documentation);
+        // Parse the documentation
+        let docData = result.documentation;
+        if (typeof docData === 'string') {
+          try {
+            docData = JSON.parse(docData);
+          } catch (e) {
+            console.error('Failed to parse generated documentation:', e);
+            throw new Error('Invalid generated documentation');
+          }
+        }
+        
+        // Set the documentation
+        setDocumentation(docData);
         setDocStatus('generated');
         setLastGenerated(new Date().toISOString());
         
-        // Reload functionalities
+        // Cache it
+        documentationService.setCache(repository.id, docData);
+        console.log('Documentation generated and cached successfully');
+        
+        // Load functionalities
         await loadFunctionalities();
+      } else {
+        console.log('No documentation in result, loading from API');
+        await loadDocumentation();
       }
       
     } catch (error) {

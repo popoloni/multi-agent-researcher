@@ -5,6 +5,61 @@ All notable changes to the Multi-Agent Research System project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-01-27
+
+### 🚀 Major Features Added
+
+#### Documentation Persistence & Caching System
+- **Enhanced Documentation Service**: Implemented comprehensive caching system with both memory and localStorage persistence
+- **Frontend State Management**: Added robust state management for documentation data with proper JSON parsing
+- **API Response Handling**: Enhanced frontend to handle backend JSON string responses correctly
+- **Caching Strategy**: Implemented Map-based caching with localStorage backup for reliable data persistence
+
+### 🛠️ Critical Bug Fixes
+
+#### Documentation Display Issues
+- **JSON Parsing Fix**: Resolved issue where backend returns documentation as JSON strings that need parsing
+- **State Management**: Fixed documentation state persistence when navigating between pages
+- **Caching Logic**: Implemented consistent caching mechanism to prevent data loss during navigation
+- **API Integration**: Enhanced documentation service to handle backend response format correctly
+
+### 🔧 Technical Improvements
+
+#### Frontend Enhancements
+- **Documentation Service**: Updated `frontend/src/services/documentation.js` with proper caching and JSON parsing
+- **Documentation Page**: Enhanced `frontend/src/pages/Documentation.jsx` with improved state management
+- **Error Handling**: Added comprehensive error handling for JSON parsing and API responses
+- **Logging**: Implemented detailed logging for debugging documentation persistence issues
+
+#### Backend Integration
+- **Response Format**: Backend correctly returns documentation as JSON strings in database
+- **API Consistency**: All documentation endpoints return consistent data format
+- **Error Recovery**: Improved error handling for documentation generation and retrieval
+
+### 🐛 Known Issues
+
+#### Documentation Persistence Bug
+- **Issue**: Documentation disappears when navigating from Documentation page to Functionalities page and back
+- **Status**: BROKEN - Despite multiple attempts to fix caching and state management, the issue persists
+- **Impact**: Users lose generated documentation when navigating between related pages
+- **Workaround**: Users must regenerate documentation after navigation
+- **Technical Details**: The issue appears to be related to React component lifecycle and state management conflicts
+
+### 📝 Files Changed
+**2 files changed, 150+ insertions, 50+ deletions**
+
+**Frontend Files:**
+- `frontend/src/services/documentation.js` - Enhanced caching and JSON parsing
+- `frontend/src/pages/Documentation.jsx` - Improved state management and error handling
+
+### 🏆 System Status
+- **Documentation Generation**: ✅ Working - AI generates high-quality documentation
+- **Documentation Display**: ✅ Working - Documentation displays correctly initially
+- **Documentation Persistence**: ❌ BROKEN - Documentation disappears on navigation
+- **User Experience**: ⚠️ Impacted - Users must regenerate documentation after navigation
+
+---
+
 ## [1.3.0] - 2025-06-30
 
 ### 🚀 Major Features Added

@@ -473,32 +473,35 @@ class LeadResearchAgent(BaseAgent):
         task: SubAgentTask, 
         agent_id: str
     ) -> SubAgentResult:
-        """Execute a subagent task with progress tracking"""
-        
+        """Execute a subagent task with progress tracking and real-time updates"""
         try:
             # Update status: Starting task
             await self._update_agent_activity(
                 agent_id=agent_id,
                 status=AgentStatus.SEARCHING,
-                current_task=f"Starting: {task.objective}",
-                progress=10
+                current_task=f"Searching: {task.objective[:60]}... (step 0)",
+                progress=0
             )
-            
-            # Execute the task
-            result = await subagent.execute_task(task)
-            
+            # Define progress callback
+            async def progress_callback(percent, current_task):
+                await self._update_agent_activity(
+                    agent_id=agent_id,
+                    status=AgentStatus.SEARCHING if percent < 100 else AgentStatus.COMPLETED,
+                    current_task=current_task,
+                    progress=percent
+                )
+            # Execute the task with progress callback
+            result = await subagent.execute_task(task, progress_callback=progress_callback)
             # Update status: Task completed
             await self._update_agent_activity(
                 agent_id=agent_id,
                 status=AgentStatus.COMPLETED,
-                current_task="Task completed",
+                current_task=f"Completed: {task.objective[:60]}...",
                 progress=100,
                 sources_found=len(result.sources),
                 tokens_used=result.token_count
             )
-            
             return result
-            
         except Exception as e:
             # Update status: Task failed
             await self._update_agent_activity(

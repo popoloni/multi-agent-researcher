@@ -59,11 +59,19 @@ const Repositories = () => {
     }
 
     try {
+      setIsLoading(true);
       await repositoryService.deleteRepository(repositoryId);
+      
+      // Immediately remove from local state
       setRepositories(prev => prev.filter(repo => repo.id !== repositoryId));
+      
+      // Refresh the full list to ensure sync with backend
+      await loadRepositories();
     } catch (error) {
       console.error('Error deleting repository:', error);
       alert('Failed to delete repository. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 

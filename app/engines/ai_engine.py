@@ -286,21 +286,25 @@ class AIEngine:
     def _select_model(self, complexity: ModelComplexity, analysis_type: AnalysisType) -> str:
         """Select the best model for the given complexity and analysis type"""
         
+        # Use specific model for documentation generation if configured
+        if analysis_type == AnalysisType.DOCUMENTATION_GENERATION:
+            return settings.DOCUMENTATION_MODEL
+        
         # Model selection strategy based on complexity
         if complexity == ModelComplexity.COMPLEX:
             # Use most powerful available model
-            if hasattr(settings, 'anthropic_api_key') and settings.anthropic_api_key:
-                return 'claude-3-5-sonnet-20241022'
+            if hasattr(settings, 'ANTHROPIC_API_KEY') and settings.ANTHROPIC_API_KEY:
+                return settings.AVAILABLE_MODELS["claude-4-opus"]
             elif hasattr(settings, 'openai_api_key') and settings.openai_api_key:
                 return 'gpt-4'
         
         elif complexity == ModelComplexity.MEDIUM:
             # Use balanced model
-            if hasattr(settings, 'anthropic_api_key') and settings.anthropic_api_key:
-                return 'claude-3-5-sonnet-20241022'
+            if hasattr(settings, 'ANTHROPIC_API_KEY') and settings.ANTHROPIC_API_KEY:
+                return settings.LEAD_AGENT_MODEL
         
-        # Default to Ollama for simple tasks or when others unavailable
-        return 'llama3.2:latest'
+        # Default to local model for simple tasks or when others unavailable
+        return 'llama3.2:1b'
     
     def _build_prompt(self, analysis_type: AnalysisType, request: AnalysisRequest) -> str:
         """Build specialized prompt for analysis type"""

@@ -7,6 +7,9 @@ class Settings:
     # Database Configuration
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./kenobi.db")
     
+    # AI Provider Configuration
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "ollama")  # Default to ollama, can be "anthropic"
+    
     # API Keys
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     
@@ -98,10 +101,34 @@ class Settings:
         }
     }
     
-    # Model Configuration - Using Claude 4 Sonnet as default for optimal performance/cost balance
-    LEAD_AGENT_MODEL: str = os.getenv("LEAD_AGENT_MODEL", AVAILABLE_MODELS["claude-4-sonnet"])
-    SUBAGENT_MODEL: str = os.getenv("SUBAGENT_MODEL", AVAILABLE_MODELS["claude-4-sonnet"])
-    CITATION_MODEL: str = os.getenv("CITATION_MODEL", AVAILABLE_MODELS["claude-3-5-haiku"])
+    # Model Configuration - Default to Ollama models, switch to Claude if AI_PROVIDER is anthropic
+    @property
+    def LEAD_AGENT_MODEL(self) -> str:
+        if self.AI_PROVIDER == "anthropic" and self.ANTHROPIC_API_KEY:
+            return os.getenv("LEAD_AGENT_MODEL", self.AVAILABLE_MODELS["claude-4-sonnet"])
+        return os.getenv("LEAD_AGENT_MODEL", "llama3.2:1b")
+    
+    @property
+    def SUBAGENT_MODEL(self) -> str:
+        if self.AI_PROVIDER == "anthropic" and self.ANTHROPIC_API_KEY:
+            return os.getenv("SUBAGENT_MODEL", self.AVAILABLE_MODELS["claude-4-sonnet"])
+        return os.getenv("SUBAGENT_MODEL", "llama3.2:1b")
+    
+    @property
+    def CITATION_MODEL(self) -> str:
+        if self.AI_PROVIDER == "anthropic" and self.ANTHROPIC_API_KEY:
+            return os.getenv("CITATION_MODEL", self.AVAILABLE_MODELS["claude-3-5-haiku"])
+        return os.getenv("CITATION_MODEL", "llama3.2:1b")
+    
+    # Kenobi Chat and Code Analysis Model
+    @property
+    def KENOBI_MODEL(self) -> str:
+        return os.getenv("KENOBI_MODEL", self.LEAD_AGENT_MODEL)
+    
+    # Documentation Generation Model
+    @property
+    def DOCUMENTATION_MODEL(self) -> str:
+        return os.getenv("DOCUMENTATION_MODEL", self.LEAD_AGENT_MODEL)
     
     # Agent Configuration
     MAX_THINKING_LENGTH: int = 50000
@@ -118,6 +145,10 @@ class Settings:
     
     # Rate Limiting
     MAX_TOKENS_PER_REQUEST: int = 100000
+    
+    # Google Custom Search API
+    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+    GOOGLE_CSE_ID: str = os.getenv("GOOGLE_CSE_ID", "")
     
     @classmethod
     def get_model_info(cls) -> dict:

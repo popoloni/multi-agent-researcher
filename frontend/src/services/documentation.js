@@ -1,89 +1,179 @@
 import api from './api';
 
-export const documentationService = {
-  // Get repository documentation
-  getDocumentation: (repositoryId, branch = 'main') => 
-    api.get(`/kenobi/repositories/${repositoryId}/documentation`, {
-      params: { branch }
-    }),
-  
-  // Generate documentation for repository (Async)
-  generateDocumentation: (repositoryId, options = {}) => 
-    api.post(`/kenobi/repositories/${repositoryId}/documentation`, options),
-  
+class DocumentationService {
+  constructor() {
+    this.cache = new Map();
+  }
+
   // Get documentation generation status
-  getDocumentationStatus: (repositoryId, taskId) => 
-    api.get(`/kenobi/repositories/${repositoryId}/documentation/status/${taskId}`),
-  
-  // Poll documentation generation status with progress callback
-  pollDocumentationStatus: async (repositoryId, taskId, onProgress) => {
-    const pollInterval = 2000; // Poll every 2 seconds
-    const maxAttempts = 150; // Maximum 5 minutes (150 * 2 seconds)
-    let attempts = 0;
+  async getDocumentationStatus(repositoryId, taskId) {
+    return api.get(`/kenobi/repositories/${repositoryId}/documentation/status/${taskId}`);
+  }
+
+  // Poll documentation status until complete
+  async pollDocumentationStatus(repositoryId, taskId, progressCallback) {
+    let retries = 0;
+    const maxRetries = 60; // 5 minutes with 5-second intervals
     
-    return new Promise((resolve, reject) => {
-      const poll = async () => {
-        try {
-          attempts++;
-          
-          const response = await api.get(`/kenobi/repositories/${repositoryId}/documentation/status/${taskId}`);
-          const status = response.data;
-          
-          // Call progress callback if provided
-          if (onProgress) {
-            onProgress(status);
-          }
-          
-          // Check if completed
-          if (status.status === 'completed') {
-            resolve(status);
-            return;
-          }
-          
-          // Check if failed
-          if (status.status === 'failed') {
-            reject(new Error(status.error || 'Documentation generation failed'));
-            return;
-          }
-          
-          // Check if max attempts reached
-          if (attempts >= maxAttempts) {
-            reject(new Error('Documentation generation timed out'));
-            return;
-          }
-          
-          // Continue polling if still processing
-          if (status.status === 'processing') {
-            setTimeout(poll, pollInterval);
-          } else {
-            reject(new Error(`Unknown status: ${status.status}`));
-          }
-          
-        } catch (error) {
-          reject(error);
+    while (retries < maxRetries) {
+      try {
+        const response = await this.getDocumentationStatus(repositoryId, taskId);
+        const status = response.data;
+        
+        if (progressCallback) {
+          progressCallback(status);
         }
-      };
-      
-      // Start polling
-      poll();
+        
+        if (status.status === 'completed') {
+          return status;
+        } else if (status.status === 'failed') {
+          throw new Error(status.error || 'Documentation generation failed');
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        retries++;
+      } catch (error) {
+        console.error('Error polling documentation status:', error);
+        throw error;
+      }
+    }
+    
+    throw new Error('Documentation generation timed out');
+  }
+
+  // Search documentation
+  async searchDocumentation(repositoryId, query, branch = 'main') {
+    return api.get(`/kenobi/repositories/${repositoryId}/documentation/search`, {
+      params: { query, branch }
     });
-  },
-  
+  }
+
+  // Simple cache set
+  setCache(repositoryId, data) {
+    console.log('Setting cache for:', repositoryId);
+    this.cache.set(repositoryId, data);
+    
+    // Also save to localStorage
+    try {
+      localStorage.setItem(`doc_${repositoryId}`, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save to localStorage:', e);
+    }
+  }
+
+  // Simple cache get
+  getCache(repositoryId) {
+    console.log('Getting cache for:', repositoryId);
+    
+    // Try memory cache first
+    const memoryData = this.cache.get(repositoryId);
+    if (memoryData) {
+      console.log('Found in memory cache');
+      return memoryData;
+    }
+    
+    // Try localStorage
+    try {
+      const stored = localStorage.getItem(`doc_${repositoryId}`);
+      if (stored) {
+        const data = JSON.parse(stored);
+        this.cache.set(repositoryId, data); // Update memory cache
+        console.log('Found in localStorage cache');
+        return data;
+      }
+    } catch (e) {
+      console.warn('Failed to get from localStorage:', e);
+    }
+    
+    console.log('No cache found');
+    return null;
+  }
+
+  // Clear cache
+  clearCache(repositoryId) {
+    this.cache.delete(repositoryId);
+    try {
+      localStorage.removeItem(`doc_${repositoryId}`);
+    } catch (e) {
+      console.warn('Failed to clear localStorage:', e);
+    }
+  }
+
+  // Get documentation - SIMPLE AND RELIABLE
+  async getDocumentation(repositoryId, branch = 'main') {
+    console.log('Getting documentation for:', repositoryId);
+    
+    // Check cache first
+    const cached = this.getCache(repositoryId);
+    if (cached) {
+      console.log('Returning cached documentation');
+      return {
+        data: { documentation: cached },
+        cached: true
+      };
+    }
+
+    // Get from API
+    try {
+      console.log('Fetching from API');
+      const response = await api.get(`/kenobi/repositories/${repositoryId}/documentation?branch=${branch}`);
+      
+      if (response.data && response.data.documentation) {
+        const docString = response.data.documentation;
+        
+        // Parse JSON string
+        let docData;
+        if (typeof docString === 'string') {
+          try {
+            docData = JSON.parse(docString);
+            console.log('Successfully parsed documentation');
+          } catch (e) {
+            console.error('Failed to parse documentation:', e);
+            throw new Error('Invalid documentation format');
+          }
+        } else {
+          docData = docString;
+        }
+        
+        // Cache the parsed data
+        if (docData && Object.keys(docData).length > 0) {
+          this.setCache(repositoryId, docData);
+          console.log('Documentation cached');
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error fetching documentation:', error);
+      throw error;
+    }
+  }
+
+  // Generate documentation
+  async generateDocumentation(repositoryId, options = {}) {
+    try {
+      const response = await api.post(`/kenobi/repositories/${repositoryId}/documentation`, options);
+      return response;
+    } catch (error) {
+      console.error('Error generating documentation:', error);
+      throw error;
+    }
+  }
+
   // Get API endpoints documentation
-  getApiDocumentation: (repositoryId, branch = 'main') => 
-    api.get(`/kenobi/repositories/${repositoryId}/api-docs`, {
+  async getApiDocumentation(repositoryId, branch = 'main') {
+    return api.get(`/kenobi/repositories/${repositoryId}/api-docs`, {
       params: { branch }
-    }),
+    });
+  }
   
   // Get code analysis
-  getCodeAnalysis: (repositoryId, branch = 'main') => 
-    api.get(`/kenobi/repositories/${repositoryId}/analysis`, {
+  async getCodeAnalysis(repositoryId, branch = 'main') {
+    return api.get(`/kenobi/repositories/${repositoryId}/analysis`, {
       params: { branch }
-    }),
-  
-  // Search in documentation
-  searchDocumentation: (repositoryId, query, branch = 'main') => 
-    api.get(`/kenobi/repositories/${repositoryId}/documentation/search`, {
-      params: { query, branch }
-    }),
-};
+    });
+  }
+}
+
+// Export a singleton instance
+export const documentationService = new DocumentationService();

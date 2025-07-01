@@ -59,38 +59,19 @@ const ResearchProgress = ({ status, isActive }) => {
 
   const { stage, progress, color } = getStatusInfo();
 
-  // Mock agent activities for demonstration - in real implementation, this would come from status
+  // Get real agent activities from backend status
   const getAgentActivities = () => {
-    if (!status || !isActive) return [];
+    if (!status || !isActive || !status.progress?.agent_activities) return [];
     
-    const baseActivities = [
-      { 
-        id: 1, 
-        name: 'Search Agent Alpha', 
-        status: progress < 40 ? 'searching' : progress < 80 ? 'analyzing' : 'completed', 
-        task: 'Finding recent medical AI studies',
-        progress: Math.min(progress + 10, 100),
-        tokensUsed: Math.floor(Math.random() * 500) + 200
-      },
-      { 
-        id: 2, 
-        name: 'Search Agent Beta', 
-        status: progress < 30 ? 'waiting' : progress < 70 ? 'searching' : 'completed', 
-        task: 'Analyzing FDA approvals',
-        progress: Math.max(0, Math.min(progress - 10, 100)),
-        tokensUsed: Math.floor(Math.random() * 400) + 150
-      },
-      { 
-        id: 3, 
-        name: 'Search Agent Gamma', 
-        status: progress < 50 ? 'waiting' : progress < 90 ? 'analyzing' : 'completed', 
-        task: 'Gathering hospital statistics',
-        progress: Math.max(0, Math.min(progress - 20, 100)),
-        tokensUsed: Math.floor(Math.random() * 300) + 100
-      }
-    ];
-
-    return baseActivities.slice(0, status.agents?.length || 3);
+    // Use real agent activity data from the backend
+    return status.progress.agent_activities.map((activity, index) => ({
+      id: activity.agent_id || index + 1,
+      name: activity.agent_name || `Agent ${index + 1}`,
+      status: activity.status || 'waiting',
+      task: activity.current_task || 'Processing...',
+      progress: activity.progress_percentage || 0,
+      tokensUsed: activity.tokens_used || 0
+    }));
   };
 
   const agentActivities = getAgentActivities();

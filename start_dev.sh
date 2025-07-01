@@ -53,10 +53,15 @@ API_HOST=0.0.0.0
 API_PORT=12000
 DEBUG=true
 
-# Ollama Configuration
-OLLAMA_HOST=localhost
-OLLAMA_PORT=11434
+# AI Provider Configuration
+AI_PROVIDER=ollama  # Can be "ollama" or "anthropic"
+
+# Ollama Configuration (default provider)
+OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=llama3.2:1b
+
+# Anthropic Configuration (optional)
+ANTHROPIC_API_KEY=
 
 # Database Configuration
 DATABASE_URL=sqlite:///./kenobi.db

@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 from uuid import UUID, uuid4
 import asyncio
 from datetime import datetime
+import shutil
 
 from app.agents.lead_agent import LeadResearchAgent
 from app.agents.citation_agent import CitationAgent
@@ -858,30 +859,76 @@ async def index_repository(repo_request: RepositoryIndexRequest):
         raise HTTPException(status_code=400, detail=f"Repository indexing failed: {str(e)}")
 
 @app.get("/kenobi/repositories/{repo_id}/analysis")
-async def get_repository_analysis(repo_id: str) -> RepositoryAnalysis:
+async def get_repository_analysis(
+    repo_id: str, 
+    auto_recover: bool = True,
+    force_refresh: bool = False
+) -> RepositoryAnalysis:
     """
-    Get complete analysis of a repository
+    Get complete analysis of a repository with automatic health checking and recovery
     
     Returns detailed analysis including all code elements, dependencies,
     and AI-generated insights. Uses database-backed AnalysisService with cache-first strategy.
+    
+    Args:
+        repo_id: Repository ID
+        auto_recover: Whether to attempt auto-recovery if files are missing (default: True)
+        force_refresh: Force regeneration of analysis even if cached version exists (default: False)
     """
     try:
         repository = await kenobi_agent.repository_service.get_repository_metadata(repo_id)
         if not repository:
             raise HTTPException(status_code=404, detail="Repository not found")
         
-        # Try to get analysis from AnalysisService (database + cache)
-        analysis_result = await analysis_service.get_analysis_results(repo_id)
+        # Try to get analysis from AnalysisService (database + cache) unless force refresh
+        analysis_result = None
+        if not force_refresh:
+            analysis_result = await analysis_service.get_analysis_results(repo_id)
         
-        if analysis_result:
+        if analysis_result and not force_refresh:
             # Convert stored analysis back to RepositoryAnalysis format
             # For now, return the stored analysis data
             logger.info(f"Retrieved analysis for {repo_id} from database/cache")
             return analysis_result.analysis_result.analysis_data
         else:
-            # Fallback: Generate new analysis using repository service
-            logger.info(f"Generating new analysis for {repo_id}")
-            analysis = await kenobi_agent.repository_service.analyze_repository(repo_id)
+            # Generate new analysis using repository service with health checking
+            logger.info(f"Generating new analysis for {repo_id} with health checking")
+            
+            try:
+                # Use health check enabled analysis
+                analysis = await kenobi_agent.repository_service.analyze_repository_with_health_check(
+                    repo_id, auto_recover=auto_recover
+                )
+            except ValueError as e:
+                # Repository health issues
+                error_message = str(e)
+                health_check = await kenobi_agent.repository_service.check_repository_health(repo_id)
+                
+                if "auto-recovery failed" in error_message.lower():
+                    raise HTTPException(
+                        status_code=503,
+                        detail={
+                            "error": "Repository files are missing and auto-recovery failed",
+                            "message": error_message,
+                            "health_status": health_check,
+                            "suggestions": [
+                                "Repository files may be corrupted or source URL may be inaccessible",
+                                "Try manual recovery using POST /kenobi/repositories/{repo_id}/recover",
+                                "Check if the source repository is still available"
+                            ]
+                        }
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "error": "Repository is not accessible for analysis",
+                            "message": error_message,
+                            "health_status": health_check,
+                            "auto_recovery_available": health_check.get("status") in ["local_path_missing", "empty_directory", "no_accessible_files"],
+                            "suggestions": health_check.get("recommendations", [])
+                        }
+                    )
             
             # Save the analysis to database for future use
             try:
@@ -1062,19 +1109,33 @@ async def delete_repository(repository_id: str) -> Dict[str, Any]:
     Delete a repository and all its associated data
     """
     try:
-        # Check if repository exists in the dictionary
-        if repository_id not in kenobi_agent.repository_service.repositories:
+        # Get repository info before deletion
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
             raise HTTPException(status_code=404, detail=f"Repository with ID {repository_id} not found")
         
-        # Get repository info before deletion
-        repository = kenobi_agent.repository_service.repositories[repository_id]
+        # Delete repository from service (this also removes from database)
+        success = await kenobi_agent.repository_service.delete_repository(repository_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete repository from database")
         
-        # Remove the repository from the service's dictionary
-        del kenobi_agent.repository_service.repositories[repository_id]
+        # Clean up local files
+        if repository.local_path and os.path.exists(repository.local_path):
+            try:
+                shutil.rmtree(repository.local_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete local files for repository {repository_id}: {e}")
         
-        # Also remove from analyses if it exists
-        if repository_id in kenobi_agent.repository_service.analyses:
-            del kenobi_agent.repository_service.analyses[repository_id]
+        # Clean up associated data
+        try:
+            # Delete documentation
+            await documentation_service.delete_documentation(repository_id)
+            # Delete analysis results
+            await analysis_service.delete_analysis_results(repository_id)
+            # Delete chat history
+            await chat_history_service.clear_conversation_history(repository_id)
+        except Exception as e:
+            logger.warning(f"Failed to clean up some associated data for repository {repository_id}: {e}")
         
         return {
             "success": True,
@@ -1089,12 +1150,23 @@ async def delete_repository(repository_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to delete repository: {str(e)}")
 
 @app.get("/kenobi/repositories/{repository_id}/functionalities")
-async def get_repository_functionalities(repository_id: str, branch: str = "main") -> Dict[str, Any]:
+async def get_repository_functionalities(
+    repository_id: str, 
+    branch: str = "main",
+    auto_recover: bool = True,
+    include_health_info: bool = False
+) -> Dict[str, Any]:
     """
-    Get functionalities registry for a repository
+    Get functionalities registry for a repository with automatic health checking and recovery
     
     Returns a list of functions, classes, and other code elements
     that can be used for documentation generation.
+    
+    Args:
+        repository_id: Repository ID
+        branch: Branch name (default: main)
+        auto_recover: Whether to attempt auto-recovery if files are missing (default: True)
+        include_health_info: Whether to include health check information in response (default: False)
     """
     try:
         # Check if repository exists
@@ -1102,8 +1174,55 @@ async def get_repository_functionalities(repository_id: str, branch: str = "main
         if not repository:
             raise HTTPException(status_code=404, detail="Repository not found")
         
-        # Get repository analysis which contains the functionalities
-        analysis = await kenobi_agent.repository_service.analyze_repository(repository_id)
+        health_info = None
+        recovery_info = None
+        
+        # Perform health check and auto-recovery if enabled
+        try:
+            # Get repository analysis with health checking and auto-recovery
+            analysis = await kenobi_agent.repository_service.analyze_repository_with_health_check(
+                repository_id, auto_recover=auto_recover
+            )
+            
+            # If health info is requested, get current health status
+            if include_health_info:
+                health_info = await kenobi_agent.repository_service.check_repository_health(repository_id)
+            
+        except ValueError as e:
+            # Repository health issues or recovery failures
+            error_message = str(e)
+            
+            # Get detailed health information for better error reporting
+            health_check = await kenobi_agent.repository_service.check_repository_health(repository_id)
+            
+            if "auto-recovery failed" in error_message.lower():
+                # Auto-recovery was attempted but failed
+                raise HTTPException(
+                    status_code=503, 
+                    detail={
+                        "error": "Repository files are missing and auto-recovery failed",
+                        "message": error_message,
+                        "health_status": health_check,
+                        "suggestions": [
+                            "Repository files may be corrupted or source URL may be inaccessible",
+                            "Try manual re-indexing of the repository",
+                            "Check if the source repository is still available"
+                        ]
+                    }
+                )
+            else:
+                # Repository is unhealthy and auto-recovery not attempted or not applicable
+                status_code = 503 if "missing" in error_message.lower() else 422
+                raise HTTPException(
+                    status_code=status_code,
+                    detail={
+                        "error": "Repository is not accessible",
+                        "message": error_message,
+                        "health_status": health_check,
+                        "auto_recovery_available": health_check.get("status") in ["local_path_missing", "empty_directory", "no_accessible_files"],
+                        "suggestions": health_check.get("recommendations", [])
+                    }
+                )
         
         # Extract functionalities from the analysis
         functionalities = []
@@ -1124,17 +1243,108 @@ async def get_repository_functionalities(repository_id: str, branch: str = "main
                 }
                 functionalities.append(functionality)
         
-        return {
+        response = {
             "functionalities": functionalities,
             "total_count": len(functionalities),
             "branch": branch,
             "repository_id": repository_id
         }
         
+        # Include health information if requested
+        if include_health_info and health_info:
+            response["health_info"] = health_info
+            
+        if recovery_info:
+            response["recovery_info"] = recovery_info
+        
+        return response
+        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Functionalities retrieval failed: {str(e)}")
+
+@app.get("/kenobi/repositories/{repository_id}/health")
+async def check_repository_health(repository_id: str) -> Dict[str, Any]:
+    """
+    Check the health of a repository by verifying file existence and integrity
+    
+    Returns detailed health information including:
+    - Whether repository files are accessible
+    - File count verification
+    - Missing files list
+    - Recovery recommendations
+    """
+    try:
+        health_status = await kenobi_agent.repository_service.check_repository_health(repository_id)
+        
+        if not health_status:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        return {
+            "repository_id": repository_id,
+            "health_check": health_status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+
+@app.post("/kenobi/repositories/{repository_id}/recover")
+async def recover_repository(
+    repository_id: str, 
+    force: bool = False,
+    background_tasks: BackgroundTasks = None
+) -> Dict[str, Any]:
+    """
+    Manually trigger repository recovery by re-cloning from source
+    
+    Args:
+        repository_id: Repository ID to recover
+        force: Force recovery even if repository appears healthy
+        background_tasks: Optional background task processing
+    """
+    try:
+        # Check if repository exists
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Perform recovery
+        recovery_result = await kenobi_agent.repository_service.auto_recover_repository(
+            repository_id, force=force
+        )
+        
+        if recovery_result["success"]:
+            # Clear analysis cache to force re-analysis
+            if hasattr(kenobi_agent.repository_service, 'analyses') and repository_id in kenobi_agent.repository_service.analyses:
+                del kenobi_agent.repository_service.analyses[repository_id]
+            
+            return {
+                "success": True,
+                "repository_id": repository_id,
+                "recovery_result": recovery_result,
+                "message": "Repository recovery completed successfully",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Repository recovery failed",
+                    "recovery_result": recovery_result,
+                    "suggestions": [
+                        "Check if the source repository URL is still accessible",
+                        "Verify network connectivity",
+                        "Consider manual re-indexing with updated repository URL"
+                    ]
+                }
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Repository recovery failed: {str(e)}")
 
 @app.post("/kenobi/repositories/{repository_id}/documentation")
 async def generate_documentation(repository_id: str, background_tasks: BackgroundTasks, options: Dict[str, Any] = None) -> Dict[str, Any]:

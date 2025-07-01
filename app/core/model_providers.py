@@ -102,9 +102,16 @@ class AnthropicProvider(BaseModelProvider):
             )
             
             response = message.content[0].text
-            token_count = message.usage.total_tokens
+            # Handle Anthropic API usage structure
+            if hasattr(message.usage, 'input_tokens') and hasattr(message.usage, 'output_tokens'):
+                token_count = message.usage.input_tokens + message.usage.output_tokens
+            elif hasattr(message.usage, 'total_tokens'):
+                token_count = message.usage.total_tokens
+            else:
+                # Fallback estimation if usage info is not available
+                token_count = len(response.split()) * 1.3
             
-            return response, token_count
+            return response, int(token_count)
             
         except Exception as e:
             raise Exception(f"Anthropic API error: {e}")

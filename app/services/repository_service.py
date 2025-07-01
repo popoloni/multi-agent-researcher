@@ -155,9 +155,11 @@ class RepositoryService:
                 "Preparing clone operation...", progress_callback
             )
             
-            # Prepare local path
+            # Prepare local path with unique directory
             local_dir_name = local_name or repo
-            local_path = f"/tmp/kenobi_repos/{local_dir_name}"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_dir = f"{local_dir_name}_{owner}_{timestamp}"
+            local_path = f"/tmp/kenobi_repos/{unique_dir}"
             
             # Clean up existing directory if it exists
             if os.path.exists(local_path):
@@ -512,22 +514,42 @@ class RepositoryService:
         """Delete repository from database and cache"""
         await self._ensure_initialized()
         
+        # Get repository info before deletion
+        repository = await self.get_repository_metadata(repo_id)
+        if not repository:
+            logger.warning(f"Repository {repo_id} not found for deletion")
+            return False
+        
+        success = True
+        
         # Remove from database
         try:
             await self.db_service.delete_repository(repo_id)
             logger.debug(f"Deleted repository {repo_id} from database")
         except Exception as e:
             logger.error(f"Failed to delete repository {repo_id} from database: {e}")
+            success = False
         
         # Remove from cache
         if repo_id in self.repositories:
             del self.repositories[repo_id]
+            logger.debug(f"Removed repository {repo_id} from cache")
         
         # Remove analysis if exists
         if repo_id in self.analyses:
             del self.analyses[repo_id]
+            logger.debug(f"Removed analysis for repository {repo_id}")
         
-        return True
+        # Clean up local files if they exist
+        if repository.local_path and os.path.exists(repository.local_path):
+            try:
+                shutil.rmtree(repository.local_path)
+                logger.debug(f"Cleaned up local files for repository {repo_id}")
+            except Exception as e:
+                logger.error(f"Failed to clean up local files for repository {repo_id}: {e}")
+                success = False
+        
+        return success
     
     async def analyze_repository(self, repo_id: str) -> RepositoryAnalysis:
         """Perform complete analysis of a repository"""
@@ -773,23 +795,386 @@ class RepositoryService:
         frameworks = set()
         
         for file in files:
-            for import_info in file.imports:
-                module = import_info.module.lower()
-                
-                # Framework detection based on imports
-                if 'react' in module:
+            # Simple framework detection based on imports and file patterns
+            if file.language == LanguageType.PYTHON:
+                for element in file.elements:
+                    if 'django' in element.code_snippet.lower():
+                        frameworks.add('Django')
+                    elif 'flask' in element.code_snippet.lower():
+                        frameworks.add('Flask')
+                    elif 'fastapi' in element.code_snippet.lower():
+                        frameworks.add('FastAPI')
+            elif file.language == LanguageType.JAVASCRIPT:
+                if 'react' in file.file_path.lower() or any('react' in elem.code_snippet.lower() for elem in file.elements):
                     frameworks.add('React')
-                elif 'angular' in module or '@angular' in module:
+                elif 'angular' in file.file_path.lower() or any('angular' in elem.code_snippet.lower() for elem in file.elements):
                     frameworks.add('Angular')
-                elif 'vue' in module:
+                elif 'vue' in file.file_path.lower() or any('vue' in elem.code_snippet.lower() for elem in file.elements):
                     frameworks.add('Vue')
-                elif 'express' in module:
-                    frameworks.add('Express')
-                elif 'django' in module:
-                    frameworks.add('Django')
-                elif 'flask' in module:
-                    frameworks.add('Flask')
-                elif 'spring' in module:
-                    frameworks.add('Spring')
         
         return list(frameworks)
+
+    async def check_repository_health(self, repo_id: str) -> Dict[str, Any]:
+        """
+        Check the health of a repository by verifying file existence and integrity
+        
+        Returns:
+            Dict with health status, missing files, and recommendations
+        """
+        try:
+            repository = await self.get_repository_metadata(repo_id)
+            if not repository:
+                return {
+                    "healthy": False,
+                    "status": "repository_not_found",
+                    "message": f"Repository {repo_id} not found in database",
+                    "missing_files": [],
+                    "recommendations": ["Repository metadata missing from database"]
+                }
+            
+            # Check if local path exists
+            repo_path = Path(repository.local_path)
+            if not repo_path.exists():
+                return {
+                    "healthy": False,
+                    "status": "local_path_missing",
+                    "message": f"Repository local path does not exist: {repository.local_path}",
+                    "missing_files": ["entire_repository"],
+                    "recommendations": [
+                        "Repository files are completely missing",
+                        "Auto-recovery available: re-clone from source",
+                        f"Original URL: {repository.url}" if repository.url else "No source URL available"
+                    ]
+                }
+            
+            # Check if it's a valid repository directory
+            if not (repo_path / '.git').exists() and not any(repo_path.iterdir()):
+                return {
+                    "healthy": False,
+                    "status": "empty_directory",
+                    "message": f"Repository directory is empty: {repository.local_path}",
+                    "missing_files": ["repository_content"],
+                    "recommendations": [
+                        "Repository directory exists but is empty",
+                        "Auto-recovery available: re-clone from source"
+                    ]
+                }
+            
+            # Check file accessibility and count
+            code_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cs', '.go', '.r', '.R', '.ipynb'}
+            accessible_files = 0
+            missing_files = []
+            total_expected = repository.file_count or 0
+            
+            try:
+                for file_path in repo_path.rglob('*'):
+                    if file_path.is_file() and file_path.suffix in code_extensions:
+                        # Skip common directories to ignore
+                        if any(part in str(file_path) for part in ['.git', 'node_modules', '__pycache__', '.venv', 'venv']):
+                            continue
+                        
+                        try:
+                            # Try to read the file
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                f.read(100)  # Read first 100 chars to verify accessibility
+                            accessible_files += 1
+                        except Exception as e:
+                            missing_files.append({
+                                "file": str(file_path.relative_to(repo_path)),
+                                "error": str(e)
+                            })
+                            
+            except Exception as e:
+                return {
+                    "healthy": False,
+                    "status": "directory_access_error",
+                    "message": f"Cannot access repository directory: {str(e)}",
+                    "missing_files": ["directory_access_failed"],
+                    "recommendations": ["Directory access failed", "Check permissions or re-clone repository"]
+                }
+            
+            # Determine health status
+            if accessible_files == 0:
+                return {
+                    "healthy": False,
+                    "status": "no_accessible_files",
+                    "message": "No code files are accessible in the repository",
+                    "missing_files": missing_files,
+                    "recommendations": [
+                        "No code files found or accessible",
+                        "Repository may be corrupted",
+                        "Auto-recovery recommended: re-clone from source"
+                    ]
+                }
+            
+            # Check if file count significantly differs from expected
+            file_count_diff = abs(accessible_files - total_expected) if total_expected > 0 else 0
+            file_count_threshold = max(5, total_expected * 0.1)  # 10% or at least 5 files
+            
+            if total_expected > 0 and file_count_diff > file_count_threshold:
+                return {
+                    "healthy": False,
+                    "status": "file_count_mismatch",
+                    "message": f"File count mismatch: expected ~{total_expected}, found {accessible_files}",
+                    "missing_files": missing_files,
+                    "accessible_files": accessible_files,
+                    "expected_files": total_expected,
+                    "recommendations": [
+                        "Significant file count difference detected",
+                        "Repository may be partially corrupted or incomplete",
+                        "Consider re-cloning to ensure completeness"
+                    ]
+                }
+            
+            # Repository is healthy
+            return {
+                "healthy": True,
+                "status": "healthy",
+                "message": "Repository is healthy and accessible",
+                "accessible_files": accessible_files,
+                "expected_files": total_expected,
+                "missing_files": missing_files,
+                "recommendations": [] if not missing_files else [
+                    f"{len(missing_files)} files have access issues but repository is mostly functional"
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Health check failed for repository {repo_id}: {str(e)}")
+            return {
+                "healthy": False,
+                "status": "health_check_failed",
+                "message": f"Health check failed: {str(e)}",
+                "missing_files": ["health_check_error"],
+                "recommendations": ["Health check system error", "Manual investigation required"]
+            }
+
+    async def auto_recover_repository(self, repo_id: str, force: bool = False) -> Dict[str, Any]:
+        """
+        Automatically recover a repository by re-cloning from its source URL
+        
+        Args:
+            repo_id: Repository ID to recover
+            force: Force recovery even if repository appears healthy
+            
+        Returns:
+            Dict with recovery status and details
+        """
+        try:
+            # Get repository metadata
+            repository = await self.get_repository_metadata(repo_id)
+            if not repository:
+                return {
+                    "success": False,
+                    "status": "repository_not_found",
+                    "message": f"Repository {repo_id} not found",
+                    "actions_taken": []
+                }
+            
+            # Check if recovery is needed (unless forced)
+            if not force:
+                health_check = await self.check_repository_health(repo_id)
+                if health_check["healthy"]:
+                    return {
+                        "success": True,
+                        "status": "recovery_not_needed",
+                        "message": "Repository is healthy, no recovery needed",
+                        "actions_taken": ["health_check_passed"]
+                    }
+            
+            # Check if we have a source URL to recover from
+            if not repository.url:
+                return {
+                    "success": False,
+                    "status": "no_source_url",
+                    "message": "Cannot recover repository: no source URL available",
+                    "actions_taken": ["checked_metadata"]
+                }
+            
+            logger.info(f"Starting auto-recovery for repository {repo_id} from {repository.url}")
+            actions_taken = ["initiated_recovery"]
+            
+            # Backup existing metadata
+            original_metadata = {
+                "id": repository.id,
+                "name": repository.name,
+                "url": repository.url,
+                "language": repository.language,
+                "framework": repository.framework,
+                "description": repository.description,
+                "github_owner": repository.github_owner,
+                "github_repo": repository.github_repo,
+                "branch": repository.branch
+            }
+            actions_taken.append("backed_up_metadata")
+            
+            # Clean up existing directory if it exists
+            repo_path = Path(repository.local_path)
+            if repo_path.exists():
+                try:
+                    import shutil
+                    shutil.rmtree(repository.local_path)
+                    actions_taken.append("cleaned_existing_directory")
+                except Exception as e:
+                    logger.warning(f"Failed to clean existing directory {repository.local_path}: {e}")
+                    actions_taken.append("cleanup_failed_but_continuing")
+            
+            # Determine recovery method based on URL type
+            if repository.url.startswith(('https://github.com/', 'http://github.com/', 'git@github.com:')):
+                # GitHub repository - use enhanced clone method
+                try:
+                    import re
+                    github_pattern = r'(?:https?://github\.com/|git@github\.com:)([^/]+)/([^/\.]+)(?:\.git)?/?$'
+                    match = re.match(github_pattern, repository.url)
+                    
+                    if not match:
+                        raise ValueError("Invalid GitHub URL format")
+                    
+                    owner, repo_name = match.groups()
+                    branch = repository.branch or "main"
+                    
+                    # Re-clone using GitHub method
+                    new_repository = await self.clone_github_repository(
+                        owner=owner,
+                        repo=repo_name,
+                        branch=branch,
+                        local_name=repository.name
+                    )
+                    actions_taken.append("re_cloned_from_github")
+                    
+                except Exception as e:
+                    logger.error(f"GitHub clone failed during recovery: {e}")
+                    # Fallback to regular git clone
+                    try:
+                        new_repository = await self.clone_repository(
+                            repo_url=repository.url,
+                            local_path=repository.local_path
+                        )
+                        actions_taken.append("re_cloned_with_git_fallback")
+                    except Exception as fallback_error:
+                        return {
+                            "success": False,
+                            "status": "clone_failed",
+                            "message": f"Recovery failed: {fallback_error}",
+                            "actions_taken": actions_taken + ["github_clone_failed", "git_fallback_failed"]
+                        }
+            else:
+                # Regular git repository
+                try:
+                    new_repository = await self.clone_repository(
+                        repo_url=repository.url,
+                        local_path=repository.local_path
+                    )
+                    actions_taken.append("re_cloned_with_git")
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "status": "clone_failed",
+                        "message": f"Recovery failed: {e}",
+                        "actions_taken": actions_taken + ["git_clone_failed"]
+                    }
+            
+            # Update the repository ID to maintain consistency
+            if new_repository.id != repo_id:
+                # Update the new repository to use the original ID
+                old_id = new_repository.id
+                new_repository.id = repo_id
+                
+                # Update in repositories dict
+                if old_id in self.repositories:
+                    del self.repositories[old_id]
+                self.repositories[repo_id] = new_repository
+                
+                # Update in database
+                try:
+                    await self.db_service.save_repository(new_repository)
+                    actions_taken.append("updated_repository_id")
+                except Exception as e:
+                    logger.warning(f"Failed to update repository in database: {e}")
+                    actions_taken.append("database_update_failed")
+            
+            # Verify recovery success
+            post_recovery_health = await self.check_repository_health(repo_id)
+            if post_recovery_health["healthy"]:
+                actions_taken.append("recovery_verified")
+                
+                # Clear any existing analysis cache to force re-analysis
+                if repo_id in self.analyses:
+                    del self.analyses[repo_id]
+                    actions_taken.append("cleared_analysis_cache")
+                
+                logger.info(f"Successfully recovered repository {repo_id}")
+                return {
+                    "success": True,
+                    "status": "recovery_successful",
+                    "message": f"Repository {repository.name} successfully recovered",
+                    "actions_taken": actions_taken,
+                    "new_file_count": new_repository.file_count,
+                    "new_line_count": new_repository.line_count
+                }
+            else:
+                return {
+                    "success": False,
+                    "status": "recovery_verification_failed",
+                    "message": "Repository was re-cloned but health check still fails",
+                    "actions_taken": actions_taken + ["post_recovery_health_check_failed"],
+                    "health_details": post_recovery_health
+                }
+                
+        except Exception as e:
+            logger.error(f"Auto-recovery failed for repository {repo_id}: {str(e)}")
+            return {
+                "success": False,
+                "status": "recovery_system_error",
+                "message": f"Recovery system error: {str(e)}",
+                "actions_taken": ["recovery_system_error"]
+            }
+
+    async def analyze_repository_with_health_check(self, repo_id: str, auto_recover: bool = True) -> RepositoryAnalysis:
+        """
+        Analyze repository with automatic health checking and recovery
+        
+        Args:
+            repo_id: Repository ID to analyze
+            auto_recover: Whether to attempt auto-recovery if health check fails
+            
+        Returns:
+            RepositoryAnalysis object
+            
+        Raises:
+            ValueError: If repository not found or recovery fails
+            Exception: If analysis fails after successful health check
+        """
+        try:
+            # First, check repository health
+            health_check = await self.check_repository_health(repo_id)
+            
+            if not health_check["healthy"]:
+                logger.warning(f"Repository {repo_id} health check failed: {health_check['message']}")
+                
+                if auto_recover and health_check["status"] in ["local_path_missing", "empty_directory", "no_accessible_files"]:
+                    logger.info(f"Attempting auto-recovery for repository {repo_id}")
+                    
+                    recovery_result = await self.auto_recover_repository(repo_id)
+                    
+                    if recovery_result["success"]:
+                        logger.info(f"Auto-recovery successful for repository {repo_id}")
+                        # Re-check health after recovery
+                        post_recovery_health = await self.check_repository_health(repo_id)
+                        if not post_recovery_health["healthy"]:
+                            raise ValueError(f"Repository {repo_id} still unhealthy after recovery: {post_recovery_health['message']}")
+                    else:
+                        raise ValueError(f"Repository {repo_id} is unhealthy and auto-recovery failed: {recovery_result['message']}")
+                else:
+                    # Auto-recovery not enabled or not applicable
+                    raise ValueError(f"Repository {repo_id} is unhealthy: {health_check['message']}. Health status: {health_check['status']}")
+            
+            # Proceed with normal analysis
+            return await self.analyze_repository(repo_id)
+            
+        except ValueError:
+            # Re-raise ValueError as is (these are expected repository issues)
+            raise
+        except Exception as e:
+            logger.error(f"Analysis with health check failed for repository {repo_id}: {str(e)}")
+            raise Exception(f"Repository analysis failed: {str(e)}")

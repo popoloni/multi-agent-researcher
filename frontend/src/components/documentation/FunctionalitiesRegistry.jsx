@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FileText, ExternalLink, Eye, Search, Filter, List, TreePine, ChevronDown, ChevronRight, Folder, File } from 'lucide-react';
-import { repositoryService } from '../../services/repositories';
+import { repositoryService, cleanRepositoryPath } from '../../services/repositories';
 import LoadingSpinner from '../common/LoadingSpinner';
 import StatusBadge from '../common/StatusBadge';
 
@@ -576,6 +576,41 @@ const FunctionalityRow = ({
       </div>
     );
   }
+};
+
+const FunctionalityItem = ({ functionality, level = 0 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Clean the path for display
+  const displayPath = functionality.path ? cleanRepositoryPath(functionality.path) : functionality.name;
+  
+  return (
+    <div className={`pl-${level * 4}`}>
+      <div className="flex items-center py-2">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center text-gray-700 hover:text-gray-900"
+        >
+          {functionality.children?.length > 0 && (
+            <span className="mr-2">{isExpanded ? '▼' : '▶'}</span>
+          )}
+          <span className="font-medium">{displayPath}</span>
+        </button>
+        {functionality.items && (
+          <span className="ml-2 text-sm text-gray-500">
+            ({functionality.items} items)
+          </span>
+        )}
+      </div>
+      {isExpanded && functionality.children?.map((child, index) => (
+        <FunctionalityItem
+          key={index}
+          functionality={child}
+          level={level + 1}
+        />
+      ))}
+    </div>
+  );
 };
 
 export default FunctionalitiesRegistry;
