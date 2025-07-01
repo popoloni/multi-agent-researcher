@@ -15,6 +15,7 @@ import {
 import { researchService } from '../../services/research';
 import ResearchProgress from './ResearchProgress';
 import ResearchResults from './ResearchResults';
+import ResearchHistory from './ResearchHistory';
 
 const ResearchInterface = () => {
   // Main state management
@@ -34,6 +35,7 @@ const ResearchInterface = () => {
   const [showSettings, setShowSettings] = useState(false);
 
   const pollIntervalRef = useRef(null);
+  const historyRef = useRef(null);
 
   // Query validation effect
   useEffect(() => {
@@ -66,7 +68,17 @@ const ResearchInterface = () => {
           // Fetch final results
           try {
             const resultData = await researchService.getResearchResult(currentResearchId);
-            setResults(researchService.formatResults(resultData));
+            const formattedResults = researchService.formatResults(resultData);
+            setResults(formattedResults);
+            
+            // Add to history
+            addToHistory({
+              ...formattedResults,
+              query: query,
+              research_id: currentResearchId,
+              status: 'completed'
+            });
+            
             setIsResearching(false);
             clearInterval(pollIntervalRef.current);
           } catch (resultErr) {
@@ -179,6 +191,63 @@ const ResearchInterface = () => {
     if (count > 1800) return 'text-orange-500';
     if (count > 2000) return 'text-red-500';
     return 'text-gray-500';
+  };
+
+  // History management functions
+  const addToHistory = (researchData) => {
+    try {
+      const historyEntry = {
+        id: researchData.research_id || `research-${Date.now()}`,
+        query: researchData.query,
+        timestamp: new Date().toISOString(),
+        status: researchData.status || 'completed',
+        sources_count: researchData.sources_used?.length || 0,
+        duration: researchData.execution_time || 0,
+        tokens_used: researchData.total_tokens_used || 0,
+        subagent_count: researchData.subagent_count || 0,
+        favorite: false,
+        tags: extractTagsFromQuery(researchData.query)
+      };
+
+      // Get existing history
+      const existingHistory = JSON.parse(localStorage.getItem('research_history') || '[]');
+      
+      // Add new entry at the beginning
+      const updatedHistory = [historyEntry, ...existingHistory];
+      
+      // Save to localStorage
+      localStorage.setItem('research_history', JSON.stringify(updatedHistory));
+      
+      console.log('Added to history:', historyEntry);
+    } catch (error) {
+      console.error('Error adding to history:', error);
+    }
+  };
+
+  const extractTagsFromQuery = (query) => {
+    // Simple tag extraction based on common keywords
+    const keywords = query.toLowerCase().split(/\s+/);
+    const commonTags = [
+      'AI', 'Machine Learning', 'Technology', 'Science', 'Medical', 'Healthcare',
+      'Finance', 'Economics', 'Climate', 'Environment', 'Energy', 'Research',
+      'Innovation', 'Development', 'Analysis', 'Security', 'Data', 'Computing'
+    ];
+    
+    return commonTags.filter(tag => 
+      keywords.some(keyword => tag.toLowerCase().includes(keyword) || keyword.includes(tag.toLowerCase()))
+    ).slice(0, 3);
+  };
+
+  const loadHistoryFromAPI = async () => {
+    // This would be implemented to load history from your backend
+    // For now, return empty array as we're using localStorage
+    return [];
+  };
+
+  const handleSelectQueryFromHistory = (selectedQuery) => {
+    setQuery(selectedQuery);
+    // Optionally clear previous results
+    clearResults();
   };
 
   return (
@@ -349,24 +418,13 @@ const ResearchInterface = () => {
           />
         )}
 
-        {/* Help Text */}
+        {/* Research History */}
         {!isResearching && !results && !error && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <div className="flex items-center space-x-3">
-              <Search className="w-6 h-6 text-blue-600" />
-              <div>
-                <h3 className="font-medium text-blue-900">How to Use Multi-Agent Research</h3>
-                <p className="text-blue-700 text-sm mt-1">
-                  Enter a detailed research question above. Our AI agents will work together to gather information, 
-                  analyze sources, and provide you with a comprehensive research report with citations.
-                </p>
-                <div className="mt-2 text-blue-700 text-sm">
-                  <strong>Tips:</strong> Be specific in your query, use at least 10 characters, and consider adjusting 
-                  the number of agents and iterations in settings for different research depths.
-                </div>
-              </div>
-            </div>
-          </div>
+          <ResearchHistory 
+            ref={historyRef}
+            onSelectQuery={handleSelectQueryFromHistory}
+            onLoadHistory={loadHistoryFromAPI}
+          />
         )}
       </div>
     </div>
