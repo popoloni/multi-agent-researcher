@@ -1,97 +1,191 @@
 # API Quick Reference
 
-## 🚀 Most Common Endpoints
+Essential endpoints for the Multi-Agent Research System.
+
+## 🚀 Getting Started
+
+```bash
+# Start server
+uvicorn app.main:app --host 0.0.0.0 --port 12000
+
+# Check health
+curl http://localhost:12000/health
+```
+
+## 📁 Repository Management
+
+### Basic Operations
+```bash
+# Index a repository
+curl -X POST http://localhost:12000/kenobi/repositories/index \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/path/to/repo", "name": "my-repo"}'
+
+# List repositories
+curl http://localhost:12000/kenobi/repositories
+
+# Get repository details
+curl http://localhost:12000/kenobi/repositories/{repository_id}
+
+# Delete repository
+curl -X DELETE http://localhost:12000/kenobi/repositories/{repository_id}
+```
+
+### Repository Analysis
+```bash
+# Get repository analysis
+curl http://localhost:12000/kenobi/repositories/{repo_id}/analysis
+
+# Get dependencies
+curl http://localhost:12000/kenobi/repositories/{repo_id}/dependencies
+
+# Comprehensive analysis
+curl -X POST http://localhost:12000/kenobi/repositories/comprehensive-analysis \
+  -H "Content-Type: application/json" \
+  -d '{"repository_path": "/path/to/repo", "repository_name": "my-repo"}'
+```
+
+## 📚 Documentation
+
+### AI Documentation Generation
+```bash
+# Generate documentation
+curl -X POST http://localhost:12000/kenobi/repositories/{repository_id}/documentation \
+  -H "Content-Type: application/json" \
+  -d '{"options": {"include_architecture": true}}'
+
+# Check generation status
+curl http://localhost:12000/kenobi/repositories/{repository_id}/documentation/status/{task_id}
+
+# Get generated documentation
+curl http://localhost:12000/kenobi/repositories/{repository_id}/documentation
+```
+
+## 💬 Chat & RAG
+
+### Repository Chat
+```bash
+# Create chat session
+curl -X POST http://localhost:12000/chat/repository/{repo_id}/session
+
+# Send message
+curl -X POST http://localhost:12000/chat/repository/{repo_id} \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Explain the main function", "session_id": "session123"}'
+
+# Get chat history
+curl http://localhost:12000/chat/repository/{repo_id}/history?session_id=session123
+```
+
+## 🔍 Search
+
+### Code Search
+```bash
+# Search code
+curl -X POST http://localhost:12000/kenobi/search/code \
+  -H "Content-Type: application/json" \
+  -d '{"query": "function main", "repository_id": "repo123"}'
+
+# Semantic search
+curl -X POST http://localhost:12000/kenobi/search/semantic \
+  -H "Content-Type: application/json" \
+  -d '{"query": "authentication logic", "repository_id": "repo123"}'
+```
+
+## 🤖 AI Analysis
+
+### Code Analysis
+```bash
+# Analyze code
+curl -X POST http://localhost:12000/kenobi/ai/analyze-code \
+  -H "Content-Type: application/json" \
+  -d '{"code": "function test() {}", "language": "javascript"}'
+
+# Explain code
+curl -X POST http://localhost:12000/kenobi/ai/explain-code \
+  -H "Content-Type: application/json" \
+  -d '{"code": "function test() {}", "language": "javascript"}'
+
+# Generate tests
+curl -X POST http://localhost:12000/kenobi/ai/generate-tests \
+  -H "Content-Type: application/json" \
+  -d '{"code": "function test() {}", "language": "javascript"}'
+```
+
+## 🔗 GitHub Integration
 
 ### Repository Operations
 ```bash
-# Index repository
-POST /kenobi/repositories/index
-{"path": "/path/to/repo", "name": "repo-name"}
+# Search GitHub repositories
+curl "http://localhost:12000/github/search?q=python+fastapi&sort=stars"
 
-# List repositories
-GET /repositories
+# Get repository info
+curl http://localhost:12000/github/repositories/{owner}/{repo}
 
-# Get repository details
-GET /repositories/{id}
+# Clone repository
+curl -X POST http://localhost:12000/github/repositories/clone \
+  -H "Content-Type: application/json" \
+  -d '{"owner": "owner", "repo": "repo", "branch": "main"}'
+
+# Check clone status
+curl http://localhost:12000/github/clone-status/{repo_id}
 ```
 
-### Analysis Operations
+## 📊 Dashboard & Monitoring
+
+### System Overview
 ```bash
-# Comprehensive analysis
-POST /kenobi/repositories/comprehensive-analysis
-{"repository_path": "/path", "repository_name": "name"}
+# Dashboard overview
+curl http://localhost:12000/kenobi/dashboard/overview
 
-# Repository health
-GET /kenobi/repositories/{id}/health
-
-# Get insights
-GET /kenobi/repositories/{id}/insights
-```
-
-### AI Operations
-```bash
-# Analyze code with AI
-POST /kenobi/ai/analyze-code
-{"code": "code_string", "language": "python"}
-
-# Generate tests
-POST /kenobi/ai/generate-tests
-{"code": "code_string", "language": "python"}
-```
-
-### Dashboard & Monitoring
-```bash
-# System overview
-GET /kenobi/dashboard/overview
+# Real-time dashboard
+curl http://localhost:12000/kenobi/dashboard/real-time
 
 # Repository dashboard
-GET /kenobi/dashboard/repository/{id}
+curl http://localhost:12000/kenobi/dashboard/repository/{repository_id}
 
-# Quality dashboard
-GET /kenobi/dashboard/quality
+# System status
+curl http://localhost:12000/kenobi/status
 ```
 
-## 📊 Response Formats
+## 🗄️ Cache & Analytics
 
-### Standard Success Response
-```json
-{
-  "status": "success",
-  "data": {},
-  "timestamp": "2025-06-27T12:00:00Z"
-}
-```
-
-### Repository Response
-```json
-{
-  "repository_id": "uuid",
-  "name": "string",
-  "path": "string",
-  "indexed_at": "datetime",
-  "file_count": "number"
-}
-```
-
-## ⚡ Quick Examples
-
-### Complete Workflow
+### Cache Management
 ```bash
-# 1. Index repository
-REPO_ID=$(curl -s -X POST http://localhost:8080/kenobi/repositories/index \
-  -H "Content-Type: application/json" \
-  -d '{"path": "/my/repo", "name": "my-repo"}' | jq -r '.repository_id')
+# Cache statistics
+curl http://localhost:12000/kenobi/cache/stats
 
-# 2. Run analysis
-curl -X POST http://localhost:8080/kenobi/repositories/comprehensive-analysis \
-  -H "Content-Type: application/json" \
-  -d '{"repository_path": "/my/repo", "repository_name": "my-repo"}'
+# Clear cache
+curl -X POST http://localhost:12000/kenobi/cache/clear
 
-# 3. Get insights
-curl -X GET http://localhost:8080/kenobi/repositories/$REPO_ID/insights
+# System metrics
+curl http://localhost:12000/kenobi/analytics/metrics
 ```
 
-## 🔗 Related Documentation
+## 🧮 Vector Operations
 
-- [Complete API Reference](./complete-api-reference.md)
-- [Interactive Docs](http://localhost:8080/docs)
+### Vector Search
+```bash
+# Embed repository
+curl -X POST http://localhost:12000/kenobi/vectors/embed-repository \
+  -H "Content-Type: application/json" \
+  -d '{"repository_id": "repo123"}'
+
+# Similarity search
+curl -X POST http://localhost:12000/kenobi/vectors/similarity-search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "authentication", "repository_id": "repo123"}'
+```
+
+## ⚠️ Important Notes
+
+- **Base URL**: `http://localhost:12000`
+- **Frontend**: `http://localhost:12001`
+- **Research Endpoints**: Mock implementation in v1.3.0
+- **Async Operations**: Documentation generation uses background tasks
+- **Session Management**: Chat requires session IDs for context
+
+## 🔗 Interactive Documentation
+
+- **Swagger UI**: `http://localhost:12000/docs`
+- **ReDoc**: `http://localhost:12000/redoc`

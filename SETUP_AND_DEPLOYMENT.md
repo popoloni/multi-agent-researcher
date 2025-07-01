@@ -17,11 +17,13 @@ This guide provides a comprehensive, tested approach to setting up and running t
 
 The Multi-Agent Researcher is a comprehensive code analysis and chat system that consists of:
 
-- **Backend API**: FastAPI-based REST API for repository analysis and AI chat (61 endpoints)
+- **Backend API**: FastAPI-based REST API for repository analysis, AI chat, documentation, dashboard, and more (**90+ endpoints**)
 - **Frontend UI**: React-based web interface for interacting with the system
 - **Ollama Integration**: Local AI model for code analysis and chat
 - **Repository Indexing**: Code parsing and semantic search capabilities
 - **Kenobi Agent**: AI assistant for code-related questions
+- **Documentation Generation**: AI-powered professional documentation
+- **Dashboard & Monitoring**: Real-time system and repository metrics
 
 ## Prerequisites
 
@@ -100,7 +102,7 @@ EOL
 ### Step 4: Make Scripts Executable
 
 ```bash
-chmod +x start_all.sh start_dev.sh start_ui.sh
+chmod +x start_all.sh start_dev.sh start_ui.sh stop_all.sh check_status.sh restart_backend.sh
 ```
 
 ## Quick Start
@@ -118,9 +120,16 @@ source researcher-env/bin/activate
 This script will:
 1. Start Ollama service (if not running)
 2. Download llama3.2:1b model (first time: ~1.3GB)
-2. Start the backend API on port 12000
-3. Start the frontend UI on port 12001
-4. Show you the status and access URLs
+3. Start the backend API on port 12000
+4. Start the frontend UI on port 12001
+5. Show you the status and access URLs
+
+**Alternative scripts:**
+- `./start_dev.sh` — Start backend + Ollama only
+- `./start_ui.sh` — Start frontend only
+- `./stop_all.sh` — Stop all services
+- `./check_status.sh` — Check status of all services
+- `./restart_backend.sh` — Restart backend API only
 
 ### Accessing the System
 
@@ -135,12 +144,15 @@ Once started, you can access:
 ### Backend API (Port 12000)
 
 The backend provides:
-- 61 production-ready API endpoints
+- **90+ production-ready API endpoints**
 - Repository indexing and analysis
 - AI-powered code chat via Kenobi agent
 - Semantic code search with ChromaDB fallback
 - Documentation generation
 - Real-time health monitoring
+- Dashboard and quality metrics
+- GitHub integration (search, clone, branch management)
+- Cache and analytics endpoints
 
 ### Frontend UI (Port 12001)
 
@@ -150,6 +162,7 @@ The frontend offers:
 - Code search and exploration
 - Documentation viewing
 - System dashboard and monitoring
+- Functionalities registry (tree-view code navigation)
 
 ### Ollama Integration (Port 11434)
 
@@ -166,6 +179,8 @@ Ollama provides:
 ```bash
 # Check system status
 ./start_all.sh status
+# or
+./check_status.sh
 
 # Start all services
 source researcher-env/bin/activate  # Always activate first
@@ -173,9 +188,13 @@ source researcher-env/bin/activate  # Always activate first
 
 # Stop all services
 ./start_all.sh stop
+# or
+./stop_all.sh
 
 # Restart all services
 ./start_all.sh restart
+# or
+./restart_backend.sh
 
 # Start only backend and Ollama
 source researcher-env/bin/activate
@@ -192,13 +211,16 @@ source researcher-env/bin/activate
 ```bash
 # 1. Stop all services
 ./start_all.sh stop
+# or
+./stop_all.sh
 
 # 2. Verify all services are stopped
 ./start_all.sh status
+# or
+./check_status.sh
 
 # 3. Activate virtual environment
 source researcher-env/bin/activate
-
 # 4. Start services
 ./start_all.sh
 ```
@@ -237,6 +259,7 @@ python -m spacy download en_core_web_sm
 ```bash
 # Complete cleanup and restart
 ./start_all.sh stop
+./stop_all.sh
 pkill -f ollama
 pkill -f uvicorn
 pkill -f "npm start"
@@ -355,7 +378,7 @@ curl -X POST "http://localhost:12000/kenobi/chat" \
 ```
 
 ### Complete API Reference
-For all 61 endpoints with interactive testing, visit: http://localhost:12000/docs
+For all 90+ endpoints with interactive testing, visit: http://localhost:12000/docs
 
 ## Advanced Configuration
 

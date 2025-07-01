@@ -24,15 +24,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY .env.example .env
 
-# Expose port
-EXPOSE 8080
+# Expose ports
+EXPOSE 12000
+EXPOSE 12001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:12000/health || exit 1
 
 # Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "12000"]
 ```
 
 ### Docker Compose
@@ -43,7 +44,8 @@ services:
   multi-agent-researcher:
     build: .
     ports:
-      - "8080:8080"
+      - "12000:12000"
+      - "12001:12001"
     environment:
       - REDIS_URL=redis://redis:6379
     depends_on:
@@ -142,7 +144,7 @@ User=research
 Group=research
 WorkingDirectory=/home/research/app
 Environment=PATH=/home/research/app/venv/bin
-ExecStart=/home/research/app/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
+ExecStart=/home/research/app/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 12000
 Restart=always
 RestartSec=3
 
@@ -157,7 +159,7 @@ sudo systemctl start multi-agent-researcher
 sudo systemctl enable redis-server
 sudo systemctl start redis-server
 
-echo "Installation complete! Service running on port 8080"
+echo "Installation complete! Service running on port 12000"
 ```
 
 ## ☁️ Cloud Platform Deployment
@@ -177,7 +179,11 @@ echo "Installation complete! Service running on port 8080"
       "image": "your-account.dkr.ecr.region.amazonaws.com/multi-agent-researcher:latest",
       "portMappings": [
         {
-          "containerPort": 8080,
+          "containerPort": 12000,
+          "protocol": "tcp"
+        },
+        {
+          "containerPort": 12001,
           "protocol": "tcp"
         }
       ],
@@ -237,7 +243,8 @@ spec:
       - name: multi-agent-researcher
         image: multi-agent-researcher:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 12000
+        - containerPort: 12001
         env:
         - name: REDIS_URL
           value: "redis://redis-service:6379"
@@ -251,7 +258,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: 12000
           initialDelaySeconds: 30
           periodSeconds: 10
 ```
@@ -269,7 +276,10 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 8080
+    targetPort: 12000
+  - protocol: TCP
+    port: 81
+    targetPort: 12001
   type: ClusterIP
 ```
 
@@ -306,7 +316,7 @@ export CACHE_TTL=1800
 ### Health Check Endpoint
 ```bash
 # Check system health
-curl http://localhost:8080/health
+curl http://localhost:12000/health
 
 # Expected response
 {
@@ -319,10 +329,10 @@ curl http://localhost:8080/health
 ### Performance Monitoring
 ```bash
 # System metrics
-curl http://localhost:8080/kenobi/analytics/metrics
+curl http://localhost:12000/kenobi/analytics/metrics
 
 # Cache statistics
-curl http://localhost:8080/kenobi/cache/stats
+curl http://localhost:12000/kenobi/cache/stats
 ```
 
 ## 🔄 Backup and Recovery

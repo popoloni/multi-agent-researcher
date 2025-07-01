@@ -27,43 +27,69 @@ chmod +x cleanup.sh
 - `frontend/node_modules/` - Node.js dependencies
 - `frontend/build/` - React build output
 - `frontend/dist/` - Frontend distribution files
-- `__pycache__/` - Python cache directories
+- `frontend/.next/`, `.next/`, `frontend/out/` - Next.js build and static export
+- `dist/`, `build/` - Python and general build directories
 - `*.egg-info/` - Python package info
+- `__pycache__/` - Python cache directories
 - `.pytest_cache/` - Pytest cache
+- `.coverage`, `htmlcov/` - Coverage data and reports
 
 ### Log Files
 - `*.log` - All log files
-- `server.log` - Backend server logs
-- `frontend.log` - Frontend logs
-- `ollama.log` - Ollama service logs
+- `server.log`, `frontend.log`, `server_ui.log`, `ollama.log` - Service logs
+- `logs/` - Logs directory
+- `yarn-error.log` - Yarn error log
 
 ### Temporary Files
-- `tmp/`, `temp/` - Temporary directories
+- `tmp/`, `temp/`, `/tmp/kenobi_repos` - Temporary directories
 - `*.tmp`, `*.temp` - Temporary files
 - `*~` - Backup files
 - `.DS_Store` - macOS system files
 - `Thumbs.db` - Windows thumbnail cache
+- `.cache/`, `.parcel-cache/` - General and Parcel cache
+- `.eslintcache` - ESLint cache
 
 ### Screenshots and Media
-- `screenshot*.png` - Screenshot files
-- `screen_*.png` - Screen capture files
-- `capture_*.png` - Capture files
-- `screenshots/` - Screenshots directory
+- `screenshot*.png`, `screen_*.png`, `capture_*.png`, `demo_*.png`, `test_*.png` - Screenshot and capture files
+- `screenshots/`, `captures/` - Screenshot and capture directories
+- `static/uploads/`, `media/temp/`, `downloads/` - Uploaded, temp, and download directories
 
 ### Development Files
-- `.coverage` - Coverage data
-- `htmlcov/` - Coverage HTML reports
-- `.eslintcache` - ESLint cache
 - `.vscode/settings.json` - VS Code local settings
-- `*.swp`, `*.swo` - Vim swap files
+- `.idea/` - IntelliJ IDEA files
+- `*.swp`, `*.swo`, `.*.swp` - Vim swap files
+- `.nyc_output/` - NYC coverage output
+- `junit.xml` - JUnit test results
+- `test-results/`, `coverage/` - Test results and coverage directories
 
 ### Database Files
 - `*.db`, `*.sqlite`, `*.sqlite3` - SQLite databases
 
 ### Environment Files
-- `.env.local` - Local environment files
-- `.env.development.local` - Local development config
+- `.env.local`, `.env.development.local`, `.env.production.local` - Local environment files
 - `config.local.json` - Local configuration
+
+### Package Manager Files
+- `package-lock.json.bak` - npm lock backup
+- `.yarn/` - Yarn cache
+- `node_modules.tar.gz` - Compressed node modules
+
+### Docker and Git Artifacts
+- `docker-compose.override.yml` - Docker compose override
+- `.dockerignore.bak` - Docker ignore backup
+- `.git/gc.log` - Git garbage collection log
+- `.git/hooks/pre-commit.sample` - Git hook samples
+
+### OS-Specific and Backup Files
+- `.DS_Store`, `desktop.ini`, `*.lnk` - OS-specific files
+- `*.bak`, `*.backup`, `*.orig` - Backup files
+
+### Compressed and Archive Files
+- `temp_*.zip`, `temp_*.tar.gz`, `backup_*.zip` - Temporary and backup archives
+
+### Dev Server and Monitoring Files
+- `.nuxt/`, `.vuepress/` - Nuxt.js and VuePress caches
+- `*.prof`, `*.trace`, `*.heap` - Profiling, trace, and heap dump files
 
 ## 🛡️ Safety Features
 
@@ -198,10 +224,9 @@ __pycache__/
 ## 📈 Benefits
 
 - **Smaller Repository**: Reduces repository size significantly
-- **Faster Operations**: Git operations are faster with fewer files
-- **Clean Commits**: Prevents accidental commits of temporary files
-- **Better Collaboration**: Team members don't see irrelevant files
-- **Security**: Removes potential sensitive data in logs/temp files
+- **Cleaner Commits**: Prevents accidental commits of temp files
+- **Faster CI/CD**: Less clutter for automated pipelines
+- **Easier Collaboration**: Consistent clean state for all contributors
 
 ---
 

@@ -5,7 +5,7 @@ Welcome to the comprehensive documentation for the Multi-Agent Research System -
 ## 📚 Documentation Structure
 
 ### 🚀 [API Documentation](./api/README.md)
-Complete API reference with 61 endpoints covering all system functionality.
+Complete API reference with 90+ endpoints covering all system functionality.
 
 ### 📖 [User Guides](./guides/README.md)
 Step-by-step guides for using the system effectively.
@@ -25,7 +25,7 @@ Detailed reports documenting the development phases.
 ## 🚀 System Overview
 
 The Multi-Agent Research System provides:
-- **61 API Endpoints** - Complete functionality coverage
+- **90+ API Endpoints** - Complete functionality coverage
 - **AI-Powered Analysis** - Code quality, security, performance
 - **Real-time Dashboard** - Live monitoring and analytics
 - **Semantic Search** - Vector-based code search
@@ -38,11 +38,11 @@ The Multi-Agent Research System provides:
 git clone https://github.com/popoloni/multi-agent-researcher.git
 cd multi-agent-researcher
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+uvicorn app.main:app --host 0.0.0.0 --port 12000
 ```
 
 ## 🔗 External Resources
 
 - **[GitHub Repository](https://github.com/popoloni/multi-agent-researcher)**
-- **[Interactive API Docs](http://localhost:8080/docs)**
-- **[System Dashboard](http://localhost:8080/kenobi/dashboard/overview)**
+- **[Interactive API Docs](http://localhost:12000/docs)**
+- **[System Dashboard](http://localhost:12001)**

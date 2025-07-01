@@ -1,6 +1,6 @@
 # Multi-Agent Research System
 
-An advanced AI-powered code analysis and repository management platform with 78+ comprehensive API endpoints, intelligent agents, and real-time monitoring capabilities.
+An advanced AI-powered code analysis and repository management platform with 90+ comprehensive API endpoints, intelligent agents, and real-time monitoring capabilities.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -56,7 +56,7 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 - **🤖 AI-Powered Documentation** - Professional documentation generation using Ollama LLM with real-time progress tracking
 - **📊 Hierarchical Code Analysis** - Tree-view functionalities registry with GitHub source code integration  
 - **🔍 Semantic Search** - Vector-based code search using ChromaDB
-- **⚡ Production Ready** - Extended timeout handling, graceful error recovery, 78+ API endpoints
+- **⚡ Production Ready** - Extended timeout handling, graceful error recovery, 90+ API endpoints
 - **🏗️ Multi-Agent Architecture** - Specialized agents for orchestration, analysis, and dependencies
 - **🎯 Complete Workflow** - GitHub search → clone → index → AI documentation → documentation-aware chat
 
@@ -90,15 +90,16 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 
 | Category | Endpoints | Key Features |
 |----------|-----------|--------------|
-| **Core Services** | 21 | Repository management, indexing, health monitoring |
-| **Documentation** | 15 | AI-powered generation, progress tracking, async processing |
-| **AI Analysis** | 12 | Code analysis, test generation, improvements |
-| **Functionalities** | 8 | Hierarchical registry, GitHub integration |
-| **Dashboard & Monitoring** | 10 | Real-time metrics, quality dashboards |
+| **Repository Management** | 25 | GitHub integration, cloning, indexing, analysis |
+| **Documentation** | 8 | AI-powered generation, progress tracking, async processing |
+| **Chat & RAG** | 6 | AI-powered conversations, session management |
+| **Analysis & Quality** | 15 | Code analysis, quality assessment, AI insights |
 | **Vector Operations** | 6 | Semantic search, similarity, clustering |
+| **Dashboard & Monitoring** | 10 | Real-time metrics, quality dashboards |
+| **GitHub Integration** | 10 | Repository search, cloning, branch management |
 | **Cache & Analytics** | 6 | Cache management, system metrics |
 
-**Total: 78+ Production-Ready Endpoints**
+**Total: 90+ Production-Ready Endpoints**
 
 ## 🎯 Use Cases
 
@@ -153,7 +154,7 @@ services:
 
 ## 📱 Web Interface
 
-- **[Interactive API Docs](http://localhost:12000/docs)** - Swagger UI with all 78+ endpoints
+- **[Interactive API Docs](http://localhost:12000/docs)** - Swagger UI with all 90+ endpoints
 - **[Frontend Dashboard](http://localhost:12001)** - Complete UI with AI documentation generation
 - **[Repository Management](http://localhost:12001/repositories)** - Clone, analyze, and manage repositories
 - **[Kenobi Chat](http://localhost:12001/chat)** - AI-powered chat about your codebase
@@ -167,7 +168,7 @@ Get up and running in 5 minutes with step-by-step instructions.
 
 ### 📖 [Complete Documentation](docs/README.md)
 Comprehensive documentation including:
-- **[API Reference](docs/api/README.md)** - All 78+ endpoints with examples
+- **[API Reference](docs/api/README.md)** - All 90+ endpoints with examples
 - **[User Guides](docs/guides/README.md)** - Feature guides and tutorials  
 - **[Architecture](docs/architecture/README.md)** - System design and components
 - **[Deployment Guide](docs/guides/deployment.md)** - Production deployment
@@ -181,7 +182,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed information about recent improveme
 - **Development Time**: 4 weeks, 4 phases + debugging session improvements
 - **Code Quality**: 85% complete with high-quality foundations
 - **Performance**: Extended timeout handling, real-time progress tracking
-- **Functionality**: 78+ endpoints, AI-powered documentation, hierarchical navigation
+- **Functionality**: 90+ endpoints, AI-powered documentation, hierarchical navigation
 - **Architecture**: Multi-agent system with graceful error handling
 
 ## 🧪 Testing
