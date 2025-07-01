@@ -5,7 +5,10 @@ import time
 from datetime import datetime, timezone
 from enum import Enum
 
-from app.models.schemas import ResearchQuery, ResearchResult
+from app.models.schemas import (
+    ResearchQuery, ResearchResult, ResearchProgress, 
+    DetailedResearchStatus, ResearchStage, CitationInfo
+)
 from app.agents.lead_agent import LeadResearchAgent
 from app.tools.memory_tools import MemoryStore
 
@@ -20,7 +23,7 @@ class ResearchStatus(str, Enum):
     FAILED = "failed"
 
 class ResearchTask:
-    """Research task tracking"""
+    """Research task tracking with enhanced progress information"""
     def __init__(self, research_id: UUID, query: ResearchQuery):
         self.research_id = research_id
         self.query = query
@@ -31,17 +34,79 @@ class ResearchTask:
         self.task: Optional[asyncio.Task] = None
         self.result: Optional[ResearchResult] = None
         self.error: Optional[str] = None
+        
+        # Enhanced progress tracking (Task 3.1)
+        self.current_progress: Optional[ResearchProgress] = None
+        self.last_progress_update: Optional[datetime] = None
 
 class ResearchService:
-    """Service layer for research operations"""
+    """Service layer for research operations with enhanced progress tracking"""
     
     def __init__(self):
         self.memory_store = MemoryStore()
         self._active_research: Dict[UUID, ResearchTask] = {}
         self._completed_research: Dict[UUID, ResearchTask] = {}
         
+        # Progress storage for real-time updates (Task 3.1)
+        self._progress_store: Dict[UUID, ResearchProgress] = {}
+    
+    # ===== PROGRESS STORAGE METHODS (Task 3.1) =====
+    
+    async def store_progress(self, research_id: UUID, progress: ResearchProgress) -> None:
+        """Store progress update in memory store for real-time access"""
+        self._progress_store[research_id] = progress
+        
+        # Update the research task if it exists
+        if research_id in self._active_research:
+            research_task = self._active_research[research_id]
+            research_task.current_progress = progress
+            research_task.last_progress_update = datetime.now(timezone.utc)
+            
+            # Update basic status fields for backward compatibility
+            research_task.status = ResearchStatus(progress.current_stage if isinstance(progress.current_stage, str) else progress.current_stage.value)
+            research_task.progress_percentage = progress.overall_progress_percentage
+            research_task.message = progress.stage_progress[-1].message if progress.stage_progress else "Research in progress"
+    
+    async def get_progress(self, research_id: UUID) -> Optional[ResearchProgress]:
+        """Retrieve current progress for research session"""
+        return self._progress_store.get(research_id)
+    
+    async def get_detailed_status(self, research_id: UUID) -> Optional[DetailedResearchStatus]:
+        """Get comprehensive research status with progress information"""
+        # Check active research first
+        if research_id in self._active_research:
+            research_task = self._active_research[research_id]
+            progress = self._progress_store.get(research_id)
+            
+            if progress:
+                return DetailedResearchStatus(
+                    research_id=research_id,
+                    query=research_task.query.query,
+                    status=ResearchStage(research_task.status.value),
+                    progress=progress,
+                    created_at=research_task.created_at,
+                    error_message=research_task.error
+                )
+        
+        # Check completed research
+        if research_id in self._completed_research:
+            research_task = self._completed_research[research_id]
+            progress = self._progress_store.get(research_id)
+            
+            if progress:
+                return DetailedResearchStatus(
+                    research_id=research_id,
+                    query=research_task.query.query,
+                    status=ResearchStage(research_task.status.value),
+                    progress=progress,
+                    created_at=research_task.created_at,
+                    error_message=research_task.error
+                )
+        
+        return None
+        
     async def start_research(self, query: ResearchQuery) -> UUID:
-        """Start a new research task with real LeadResearchAgent integration"""
+        """Start a new research task with enhanced progress tracking"""
         
         # Generate real UUID for research
         research_id = uuid4()
@@ -52,9 +117,9 @@ class ResearchService:
         # Store in active research
         self._active_research[research_id] = research_task
         
-        # Create and start real async research task
+        # Create and start real async research task with progress callback
         research_task.task = asyncio.create_task(
-            self._execute_research_with_progress(research_task)
+            self._execute_research_with_progress_callback(research_task)
         )
         
         # Initial status
@@ -64,19 +129,22 @@ class ResearchService:
         
         return research_id
     
-    async def _execute_research_with_progress(self, research_task: ResearchTask):
-        """Execute research with progress tracking"""
+    async def _execute_research_with_progress_callback(self, research_task: ResearchTask):
+        """Execute research with enhanced progress tracking using callback mechanism"""
         try:
-            # Update status to planning
-            research_task.status = ResearchStatus.PLANNING
-            research_task.progress_percentage = 20
-            research_task.message = "Creating research plan..."
+            # Create progress callback that stores updates
+            async def progress_callback(progress: ResearchProgress):
+                """Callback to handle progress updates from LeadResearchAgent"""
+                try:
+                    await self.store_progress(research_task.research_id, progress)
+                except Exception as e:
+                    print(f"Error storing progress: {e}")
             
-            # Create lead agent
-            lead_agent = LeadResearchAgent()
+            # Create lead agent with progress callback
+            lead_agent = LeadResearchAgent(progress_callback=progress_callback)
             
-            # Override the conduct_research method to provide progress updates
-            result = await self._conduct_research_with_tracking(lead_agent, research_task)
+            # Execute research with real-time progress tracking
+            result = await lead_agent.conduct_research(research_task.query, research_task.research_id)
             
             # Mark as completed
             research_task.status = ResearchStatus.COMPLETED
@@ -101,91 +169,81 @@ class ResearchService:
             if research_task.research_id in self._active_research:
                 del self._active_research[research_task.research_id]
     
-    async def _conduct_research_with_tracking(
-        self, 
-        lead_agent: LeadResearchAgent, 
-        research_task: ResearchTask
-    ) -> ResearchResult:
-        """Conduct research with progress tracking"""
-        start_time = time.time()
-        query = research_task.query
+    # Legacy method removed - now using LeadResearchAgent.conduct_research with progress callback
         
-        # Phase 1: Planning (20-40%)
-        research_task.status = ResearchStatus.PLANNING
-        research_task.progress_percentage = 25
-        research_task.message = "Analyzing query and creating research plan..."
-        
-        plan = await lead_agent._create_research_plan(query)
-        await lead_agent.memory_store.save_context(
-            research_task.research_id,
-            {"plan": plan.dict(), "status": "executing"}
-        )
-        
-        # Phase 2: Executing (40-80%)
-        research_task.status = ResearchStatus.EXECUTING
-        research_task.progress_percentage = 45
-        research_task.message = f"Executing research with {len(plan.subtasks)} agents..."
-        
-        results = await lead_agent._execute_research_plan(plan, query.max_iterations)
-        
-        research_task.progress_percentage = 70
-        research_task.message = "Research execution completed, processing results..."
-        
-        # Phase 3: Synthesizing (80-90%)
-        research_task.status = ResearchStatus.SYNTHESIZING
-        research_task.progress_percentage = 80
-        research_task.message = "Synthesizing findings into comprehensive report..."
-        
-        final_report = await lead_agent._synthesize_results(query.query, results)
-        
-        # Phase 4: Citations (90-95%)
-        research_task.status = ResearchStatus.CITING
-        research_task.progress_percentage = 90
-        research_task.message = "Adding citations and finalizing report..."
-        
-        cited_report = await lead_agent._add_citations(final_report, results)
-        sections = lead_agent._extract_report_sections(cited_report)
-        
-        # Convert citation_list to CitationInfo objects
-        citation_infos = [
-            CitationInfo(**citation)
-            for citation in lead_agent.citation_list
-        ]
-        
-        # Compile final result
-        all_sources = []
-        for result in results:
-            all_sources.extend(result.sources)
-            
-        research_result = ResearchResult(
-            research_id=research_task.research_id,
-            query=query.query,
-            report=cited_report,
-            citations=citation_infos,
-            sources_used=all_sources,
-            total_tokens_used=lead_agent.total_tokens + sum(r.token_count for r in results),
-            execution_time=time.time() - start_time,
-            subagent_count=len(results),
-            report_sections=sections
-        )
-        
-        # Save final result
-        await lead_agent.memory_store.save_result(research_task.research_id, research_result)
-        
-        return research_result
-        
+    def _get_enum_value(self, enum_obj):
+        """Helper to safely get enum value"""
+        return enum_obj.value if hasattr(enum_obj, 'value') else enum_obj
+    
     async def get_research_status(self, research_id: UUID) -> Dict[str, Any]:
-        """Get the status of a research task with detailed progress and meaningful data"""
+        """Get the status of a research task with enhanced progress information"""
         
+        # Try to get detailed status first
+        detailed_status = await self.get_detailed_status(research_id)
+        if detailed_status:
+            # Convert DetailedResearchStatus to dict format for API compatibility
+            progress = detailed_status.progress
+            
+            status_data = {
+                "status": self._get_enum_value(detailed_status.status),
+                "progress_percentage": progress.overall_progress_percentage,
+                "message": progress.get_current_stage_progress().message if progress.get_current_stage_progress() else self._get_enum_value(progress.current_stage),
+                "created_at": detailed_status.created_at.isoformat(),
+                "research_id": str(detailed_status.research_id),
+                "query": detailed_status.query,
+                "error": detailed_status.error_message,
+                "elapsed_time": detailed_status.elapsed_time,
+                
+                # Enhanced progress information
+                "current_stage": self._get_enum_value(progress.current_stage),
+                "stage_progress": [
+                    {
+                        "stage": self._get_enum_value(sp.stage),
+                        "progress_percentage": sp.progress_percentage,
+                        "message": sp.message,
+                        "start_time": sp.start_time.isoformat(),
+                        "end_time": sp.end_time.isoformat() if sp.end_time else None,
+                        "duration_seconds": sp.duration_seconds
+                    }
+                    for sp in progress.stage_progress
+                ],
+                "agent_activities": [
+                    {
+                        "agent_id": aa.agent_id,
+                        "agent_name": aa.agent_name,
+                        "status": self._get_enum_value(aa.status),
+                        "current_task": aa.current_task,
+                        "progress_percentage": aa.progress_percentage,
+                        "sources_found": aa.sources_found,
+                        "tokens_used": aa.tokens_used,
+                        "start_time": aa.start_time.isoformat(),
+                        "last_update": aa.last_update.isoformat(),
+                        "error_message": aa.error_message
+                    }
+                    for aa in progress.agent_activities
+                ],
+                "performance_metrics": {
+                    "total_sources_found": progress.performance_metrics.total_sources_found,
+                    "total_tokens_used": progress.performance_metrics.total_tokens_used,
+                    "total_execution_time": progress.performance_metrics.total_execution_time,
+                    "planning_time": progress.performance_metrics.planning_time,
+                    "execution_time": progress.performance_metrics.execution_time,
+                    "synthesis_time": progress.performance_metrics.synthesis_time,
+                    "citation_time": progress.performance_metrics.citation_time,
+                    "average_agent_efficiency": progress.performance_metrics.average_agent_efficiency,
+                    "success_rate": progress.performance_metrics.success_rate
+                } if progress.performance_metrics else None
+            }
+            
+            return status_data
+        
+        # Fallback to basic status for backward compatibility
         # Check active research
         if research_id in self._active_research:
             research_task = self._active_research[research_id]
             
             # Calculate elapsed time
             elapsed_time = (datetime.now(timezone.utc) - research_task.created_at).total_seconds()
-            
-            # Get additional context from memory store if available
-            context = await self.memory_store.get_context(research_id)
             
             status_data = {
                 "status": research_task.status.value,
@@ -199,28 +257,6 @@ class ResearchService:
                 "max_subagents": research_task.query.max_subagents,
                 "max_iterations": research_task.query.max_iterations
             }
-            
-            # Add plan information if available
-            if context and "plan" in context:
-                plan_data = context["plan"]
-                status_data.update({
-                    "plan": {
-                        "strategy": plan_data.get("strategy", ""),
-                        "subtask_count": len(plan_data.get("subtasks", [])),
-                        "complexity": plan_data.get("estimated_complexity", "unknown")
-                    }
-                })
-            
-            # Add stage-specific information
-            if research_task.status == ResearchStatus.EXECUTING:
-                status_data["agents"] = [
-                    {
-                        "id": f"agent_{i+1}",
-                        "status": "active" if i < research_task.query.max_subagents else "pending",
-                        "task": f"Research subtask {i+1}"
-                    }
-                    for i in range(research_task.query.max_subagents)
-                ]
             
             return status_data
         
@@ -361,7 +397,7 @@ class ResearchService:
         return len(self._completed_research)
     
     async def cleanup_completed_research(self, max_completed: int = 100):
-        """Clean up old completed research tasks to prevent memory leaks"""
+        """Clean up old completed research tasks and progress data to prevent memory leaks"""
         if len(self._completed_research) > max_completed:
             # Keep only the most recent completed research
             sorted_completed = sorted(
@@ -370,5 +406,17 @@ class ResearchService:
                 reverse=True
             )
             
+            # Get IDs to remove
+            ids_to_remove = [research_id for research_id, _ in sorted_completed[max_completed:]]
+            
+            # Clean up progress store for removed research
+            for research_id in ids_to_remove:
+                if research_id in self._progress_store:
+                    del self._progress_store[research_id]
+            
             # Keep only the most recent max_completed items
             self._completed_research = dict(sorted_completed[:max_completed])
+    
+    def get_progress_store_size(self) -> int:
+        """Get the number of progress entries stored"""
+        return len(self._progress_store)

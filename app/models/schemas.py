@@ -158,7 +158,7 @@ class ResearchProgress(BaseModel):
     overall_progress_percentage: int = Field(ge=0, le=100)
     stage_progress: List[StageProgress] = Field(default_factory=list)
     agent_activities: List[AgentActivity] = Field(default_factory=list)
-    performance_metrics: PerformanceMetrics
+    performance_metrics: Optional[PerformanceMetrics] = None
     start_time: datetime
     estimated_completion_time: Optional[datetime] = None
     last_update: datetime

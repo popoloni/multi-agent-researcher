@@ -257,9 +257,9 @@ class TestResearchServiceTask12:
             mock_lead_agent = AsyncMock()
             mock_lead_agent_class.return_value = mock_lead_agent
             
-            # Mock method to raise an error
-            mock_lead_agent._create_research_plan = AsyncMock()
-            mock_lead_agent._create_research_plan.side_effect = Exception("Test error")
+            # Mock conduct_research method to raise an error
+            mock_lead_agent.conduct_research = AsyncMock()
+            mock_lead_agent.conduct_research.side_effect = Exception("Test error")
             
             # Start research
             research_id = await research_service.start_research(sample_query)
