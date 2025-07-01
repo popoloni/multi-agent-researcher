@@ -144,6 +144,14 @@ describe('ResearchInterface - Core Functionality', () => {
   describe('Research Workflow', () => {
     test('starts research successfully', async () => {
       const user = userEvent.setup();
+      
+      researchService.startResearch.mockResolvedValue({ research_id: 'test-id-123' });
+      researchService.getResearchStatus.mockResolvedValue({
+        status: 'executing',
+        message: 'Research in progress',
+        progress_percentage: 50
+      });
+      
       render(<ResearchInterface />);
       
       const textarea = screen.getByLabelText('Research Query');
@@ -159,8 +167,10 @@ describe('ResearchInterface - Core Functionality', () => {
         });
       });
       
-      // Should show research in progress
-      expect(screen.getByText('Research in Progress')).toBeInTheDocument();
+      // Should show research in progress (ResearchProgress component shows different text)
+      await waitFor(() => {
+        expect(screen.getByText('Agents Researching')).toBeInTheDocument();
+      });
       expect(screen.getByText('Stop Research')).toBeInTheDocument();
     });
 

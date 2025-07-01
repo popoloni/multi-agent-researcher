@@ -13,6 +13,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { researchService } from '../../services/research';
+import ResearchProgress from './ResearchProgress';
+import ResearchResults from './ResearchResults';
 
 const ResearchInterface = () => {
   // Main state management
@@ -43,32 +45,63 @@ const ResearchInterface = () => {
     }
   }, [query]);
 
-  // Poll for research status updates
+  // Enhanced polling mechanism with retry logic and connection management
   useEffect(() => {
-    if (currentResearchId && isResearching) {
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          const statusData = await researchService.getResearchStatus(currentResearchId);
-          setResearchStatus(statusData);
-          
-          if (statusData.status === 'completed') {
-            // Fetch final results
+    let retryCount = 0;
+    const maxRetries = 3;
+    let pollInterval = 2000; // Start with 2 seconds
+    
+    const pollForStatus = async () => {
+      if (!currentResearchId || !isResearching) return;
+      
+      try {
+        const statusData = await researchService.getResearchStatus(currentResearchId);
+        setResearchStatus(statusData);
+        
+        // Reset retry count on successful poll
+        retryCount = 0;
+        pollInterval = 2000; // Reset to normal interval
+        
+        if (statusData.status === 'completed') {
+          // Fetch final results
+          try {
             const resultData = await researchService.getResearchResult(currentResearchId);
             setResults(researchService.formatResults(resultData));
             setIsResearching(false);
             clearInterval(pollIntervalRef.current);
-          } else if (statusData.status === 'failed') {
-            setError(statusData.message || 'Research failed');
+          } catch (resultErr) {
+            console.error('Error fetching research results:', resultErr);
+            setError('Failed to fetch research results: ' + resultErr.message);
             setIsResearching(false);
             clearInterval(pollIntervalRef.current);
           }
-        } catch (err) {
-          console.error('Error polling research status:', err);
-          setError('Failed to get research status: ' + err.message);
+        } else if (statusData.status === 'failed') {
+          setError(statusData.message || 'Research failed');
           setIsResearching(false);
           clearInterval(pollIntervalRef.current);
         }
-      }, 2000); // Poll every 2 seconds
+      } catch (err) {
+        console.error('Error polling research status:', err);
+        retryCount++;
+        
+        if (retryCount >= maxRetries) {
+          setError('Connection lost. Failed to get research status after multiple attempts.');
+          setIsResearching(false);
+          clearInterval(pollIntervalRef.current);
+        } else {
+          // Exponential backoff for retries
+          pollInterval = Math.min(pollInterval * 1.5, 10000); // Max 10 seconds
+          console.log(`Retrying in ${pollInterval}ms (attempt ${retryCount}/${maxRetries})`);
+        }
+      }
+    };
+
+    if (currentResearchId && isResearching) {
+      // Initial poll
+      pollForStatus();
+      
+      // Set up interval polling
+      pollIntervalRef.current = setInterval(pollForStatus, pollInterval);
     }
 
     return () => {
@@ -300,133 +333,20 @@ const ResearchInterface = () => {
           </div>
         )}
 
-        {/* Basic Status Display */}
+        {/* Progress Display */}
         {(isResearching || researchStatus) && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <div className="flex items-center space-x-3">
-              {isResearching ? (
-                <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
-              ) : researchStatus?.status === 'completed' ? (
-                <CheckCircle className="w-6 h-6 text-green-500" />
-              ) : researchStatus?.status === 'failed' ? (
-                <AlertCircle className="w-6 h-6 text-red-500" />
-              ) : (
-                <Clock className="w-6 h-6 text-gray-500" />
-              )}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {researchStatus?.status === 'completed' ? 'Research Complete' :
-                   researchStatus?.status === 'failed' ? 'Research Failed' :
-                   isResearching ? 'Research in Progress' : 'Research Status'}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {researchStatus?.message || 'Processing your research query...'}
-                </p>
-              </div>
-            </div>
-            
-            {researchStatus?.progress_percentage !== undefined && (
-              <div className="mt-4">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Progress</span>
-                  <span>{researchStatus.progress_percentage}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${researchStatus.progress_percentage}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          <ResearchProgress 
+            status={researchStatus}
+            isActive={isResearching}
+          />
         )}
 
-        {/* Basic Results Display */}
+        {/* Results Display */}
         {results && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <CheckCircle className="w-6 h-6 text-green-500" />
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    Research Complete
-                  </h2>
-                  <p className="text-sm text-gray-600">
-                    Query: {query}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => navigator.clipboard.writeText(results.report)}
-                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Copy report"
-                >
-                  <FileText className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    const blob = new Blob([results.report], { type: 'text/markdown' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `research-report-${Date.now()}.md`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Download report"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Basic Results Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="text-center">
-                <div className="text-lg font-semibold text-gray-900">
-                  {results.sources_used?.length || 0}
-                </div>
-                <div className="text-xs text-gray-500">Sources</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold text-gray-900">
-                  {results.tokens_formatted || '0'}
-                </div>
-                <div className="text-xs text-gray-500">Tokens</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold text-gray-900">
-                  {results.execution_time_formatted || '0s'}
-                </div>
-                <div className="text-xs text-gray-500">Duration</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold text-gray-900">
-                  {results.subagent_count || 0}
-                </div>
-                <div className="text-xs text-gray-500">Agents</div>
-              </div>
-            </div>
-
-            {/* Report Preview */}
-            <div className="border-t border-gray-200 pt-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Research Report</h3>
-              <div className="prose max-w-none">
-                <div 
-                  className="text-gray-800 whitespace-pre-wrap max-h-96 overflow-y-auto"
-                  style={{ lineHeight: '1.6' }}
-                >
-                  {results.report}
-                </div>
-              </div>
-            </div>
-          </div>
+          <ResearchResults 
+            results={results}
+            query={query}
+          />
         )}
 
         {/* Help Text */}
