@@ -323,3 +323,72 @@ class DetailedResearchStatus(BaseModel):
     
     class Config:
         use_enum_values = True
+
+
+# ===== TASK 3.2: ENHANCED API RESPONSE MODELS =====
+
+class ResearchHistoryItem(BaseModel):
+    """Research history item for listing endpoints"""
+    research_id: UUID
+    query: str
+    status: ResearchStage
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    execution_time: Optional[float] = None  # in seconds
+    sources_count: Optional[int] = None
+    tokens_used: Optional[int] = None
+    progress_percentage: float = 0.0
+    error_message: Optional[str] = None
+    
+    class Config:
+        use_enum_values = True
+
+
+class ResearchAnalytics(BaseModel):
+    """Analytics data for research operations"""
+    total_research_sessions: int
+    active_sessions: int
+    completed_sessions: int
+    failed_sessions: int
+    average_execution_time: float  # in seconds
+    total_tokens_used: int
+    total_sources_found: int
+    success_rate: float  # percentage
+    most_common_queries: List[str]
+    performance_trends: Dict[str, Any]
+    
+    
+class ProgressPollResponse(BaseModel):
+    """Response for optimized progress polling"""
+    research_id: UUID
+    has_updates: bool
+    progress: Optional[ResearchProgress] = None
+    last_update: datetime
+    next_poll_interval: int = 2  # seconds
+    
+    
+class ResearchListResponse(BaseModel):
+    """Paginated response for research history"""
+    items: List[ResearchHistoryItem]
+    total_count: int
+    page: int
+    page_size: int
+    has_next: bool
+    has_previous: bool
+
+
+class ErrorResponse(BaseModel):
+    """Standardized error response"""
+    error: str
+    detail: str
+    research_id: Optional[UUID] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    
+class ResearchStartResponse(BaseModel):
+    """Enhanced response for starting research"""
+    research_id: UUID
+    status: str
+    message: str
+    estimated_duration: Optional[int] = None  # in seconds
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

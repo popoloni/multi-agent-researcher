@@ -7,7 +7,8 @@ from enum import Enum
 
 from app.models.schemas import (
     ResearchQuery, ResearchResult, ResearchProgress, 
-    DetailedResearchStatus, ResearchStage, CitationInfo
+    DetailedResearchStatus, ResearchStage, CitationInfo,
+    ResearchHistoryItem, ResearchAnalytics, ProgressPollResponse
 )
 from app.agents.lead_agent import LeadResearchAgent
 from app.tools.memory_tools import MemoryStore
@@ -420,3 +421,196 @@ class ResearchService:
     def get_progress_store_size(self) -> int:
         """Get the number of progress entries stored"""
         return len(self._progress_store)
+    
+    # ===== TASK 3.2: ENHANCED API METHODS =====
+    
+    async def get_research_history(
+        self, 
+        limit: int = 50, 
+        offset: int = 0, 
+        status_filter: Optional[ResearchStage] = None
+    ) -> List[Dict[str, Any]]:
+        """Get research history with filtering and pagination"""
+        from app.models.schemas import ResearchHistoryItem
+        
+        # Combine active and completed research
+        all_research = {}
+        all_research.update(self._active_research)
+        all_research.update(self._completed_research)
+        
+        # Convert to history items
+        history_items = []
+        for research_id, research_task in all_research.items():
+            # Apply status filter if provided
+            if status_filter and research_task.status.value != status_filter.value:
+                continue
+            
+            # Get completion time and execution time
+            completed_at = None
+            execution_time = None
+            if research_task.status in [ResearchStatus.COMPLETED, ResearchStatus.FAILED]:
+                if hasattr(research_task, 'completed_at'):
+                    completed_at = research_task.completed_at
+                # Get execution time from result if available
+                if research_task.result and hasattr(research_task.result, 'execution_time'):
+                    execution_time = research_task.result.execution_time
+            
+            # Get sources and tokens from result if available
+            sources_count = None
+            tokens_used = None
+            if research_task.result:
+                sources_count = len(research_task.result.sources_used) if research_task.result.sources_used else 0
+                tokens_used = research_task.result.total_tokens_used
+            
+            history_item = ResearchHistoryItem(
+                research_id=research_id,
+                query=research_task.query.query,
+                status=ResearchStage(research_task.status.value),
+                created_at=research_task.created_at,
+                completed_at=completed_at,
+                execution_time=execution_time,
+                sources_count=sources_count,
+                tokens_used=tokens_used,
+                progress_percentage=research_task.progress_percentage,
+                error_message=research_task.error
+            )
+            history_items.append(history_item)
+        
+        # Sort by creation time (newest first)
+        history_items.sort(key=lambda x: x.created_at, reverse=True)
+        
+        # Apply pagination
+        start_idx = offset
+        end_idx = offset + limit
+        return history_items[start_idx:end_idx]
+    
+    async def get_research_analytics(self) -> Dict[str, Any]:
+        """Get comprehensive research analytics"""
+        from app.models.schemas import ResearchAnalytics
+        from collections import Counter
+        
+        # Combine all research data
+        all_research = {}
+        all_research.update(self._active_research)
+        all_research.update(self._completed_research)
+        
+        if not all_research:
+            return ResearchAnalytics(
+                total_research_sessions=0,
+                active_sessions=0,
+                completed_sessions=0,
+                failed_sessions=0,
+                average_execution_time=0.0,
+                total_tokens_used=0,
+                total_sources_found=0,
+                success_rate=0.0,
+                most_common_queries=[],
+                performance_trends={}
+            )
+        
+        # Calculate basic metrics
+        total_sessions = len(all_research)
+        active_sessions = len(self._active_research)
+        completed_sessions = len([r for r in all_research.values() if r.status == ResearchStatus.COMPLETED])
+        failed_sessions = len([r for r in all_research.values() if r.status == ResearchStatus.FAILED])
+        
+        # Calculate execution times
+        execution_times = []
+        total_tokens = 0
+        total_sources = 0
+        queries = []
+        
+        for research_task in all_research.values():
+            queries.append(research_task.query.query)
+            
+            if hasattr(research_task, 'execution_time') and research_task.execution_time:
+                execution_times.append(research_task.execution_time)
+            
+            if research_task.result:
+                if research_task.result.total_tokens_used:
+                    total_tokens += research_task.result.total_tokens_used
+                if research_task.result.sources_used:
+                    total_sources += len(research_task.result.sources_used)
+        
+        # Calculate averages
+        avg_execution_time = sum(execution_times) / len(execution_times) if execution_times else 0.0
+        success_rate = (completed_sessions / total_sessions * 100) if total_sessions > 0 else 0.0
+        
+        # Find most common queries (top 5)
+        query_counter = Counter(queries)
+        most_common_queries = [query for query, _ in query_counter.most_common(5)]
+        
+        # Performance trends (simplified)
+        performance_trends = {
+            "average_tokens_per_session": total_tokens / total_sessions if total_sessions > 0 else 0,
+            "average_sources_per_session": total_sources / total_sessions if total_sessions > 0 else 0,
+            "completion_rate": success_rate,
+            "active_session_ratio": (active_sessions / total_sessions * 100) if total_sessions > 0 else 0
+        }
+        
+        return ResearchAnalytics(
+            total_research_sessions=total_sessions,
+            active_sessions=active_sessions,
+            completed_sessions=completed_sessions,
+            failed_sessions=failed_sessions,
+            average_execution_time=avg_execution_time,
+            total_tokens_used=total_tokens,
+            total_sources_found=total_sources,
+            success_rate=success_rate,
+            most_common_queries=most_common_queries,
+            performance_trends=performance_trends
+        )
+    
+    async def get_research_count(self, status_filter: Optional[ResearchStage] = None) -> int:
+        """Get total count of research sessions with optional status filter"""
+        all_research = {}
+        all_research.update(self._active_research)
+        all_research.update(self._completed_research)
+        
+        if not status_filter:
+            return len(all_research)
+        
+        return len([r for r in all_research.values() if r.status.value == status_filter.value])
+    
+    async def poll_research_progress(
+        self, 
+        research_id: UUID, 
+        last_update: Optional[datetime] = None
+    ) -> ProgressPollResponse:
+        """Optimized polling endpoint with conditional updates"""
+        from app.models.schemas import ProgressPollResponse
+        
+        # Get current progress
+        progress = await self.get_progress(research_id)
+        
+        if not progress:
+            # Research not found or no progress available
+            return ProgressPollResponse(
+                research_id=research_id,
+                has_updates=False,
+                progress=None,
+                last_update=datetime.now(timezone.utc),
+                next_poll_interval=5  # Longer interval for non-existent research
+            )
+        
+        # Check if there are updates since last poll
+        has_updates = True
+        if last_update and progress.last_update <= last_update:
+            has_updates = False
+        
+        # Determine next poll interval based on research status
+        next_poll_interval = 2  # Default 2 seconds
+        if progress.current_stage == ResearchStage.COMPLETED:
+            next_poll_interval = 0  # No more polling needed
+        elif progress.current_stage == ResearchStage.FAILED:
+            next_poll_interval = 0  # No more polling needed
+        elif progress.overall_progress_percentage > 80:
+            next_poll_interval = 1  # More frequent polling near completion
+        
+        return ProgressPollResponse(
+            research_id=research_id,
+            has_updates=has_updates,
+            progress=progress if has_updates else None,
+            last_update=progress.last_update,
+            next_poll_interval=next_poll_interval
+        )

@@ -13,7 +13,12 @@ from datetime import datetime
 from app.agents.lead_agent import LeadResearchAgent
 from app.agents.citation_agent import CitationAgent
 from app.agents.kenobi_agent import KenobiAgent
-from app.models.schemas import ResearchQuery, ResearchResult, SearchResult
+from app.models.schemas import (
+    ResearchQuery, ResearchResult, SearchResult, DetailedResearchStatus,
+    ResearchProgress, ResearchHistoryItem, ResearchAnalytics, 
+    ProgressPollResponse, ResearchListResponse, ResearchStartResponse,
+    ErrorResponse, ResearchStage
+)
 from app.models.repository_schemas import (
     RepositoryIndexRequest, CodeSearchRequest, FileAnalysisRequest,
     MultiRepoSearchResult, RepositoryAnalysis, GitHubSearchRequest, 
@@ -278,13 +283,13 @@ async def test_kenobi():
             "error_type": str(type(e))
         }
 
-@app.post("/research/start")
+@app.post("/research/start", response_model=ResearchStartResponse)
 async def start_research(
     query: ResearchQuery,
     background_tasks: BackgroundTasks
-) -> Dict[str, Any]:
+) -> ResearchStartResponse:
     """
-    Start a new research task
+    Enhanced research start endpoint with proper service integration
     
     This endpoint initiates a research process that runs asynchronously.
     Returns a research_id that can be used to check status and retrieve results.
@@ -295,41 +300,46 @@ async def start_research(
         if not query.query.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
             
-        # Start research asynchronously
-        async def run_research():
-            lead_agent = LeadResearchAgent()
-            result = await lead_agent.conduct_research(query)
-            return result
-            
-        # Create task
-        task = asyncio.create_task(run_research())
+        # Start research using the research service
+        research_id = await research_service.start_research(query)
         
-        # Generate research ID (in production, this would be handled differently)
-        research_id = UUID('12345678-1234-5678-1234-567812345678')  # Mock ID
+        # Estimate duration based on complexity
+        estimated_duration = 60  # Default 1 minute
+        if query.max_subagents > 3:
+            estimated_duration += 30
+        if query.max_iterations > 5:
+            estimated_duration += 20
         
-        return {
-            "research_id": str(research_id),
-            "status": "started",
-            "message": "Research task initiated successfully"
-        }
+        return ResearchStartResponse(
+            research_id=research_id,
+            status="started",
+            message="Research task initiated successfully",
+            estimated_duration=estimated_duration
+        )
         
     except Exception as e:
+        logger.error(f"Error starting research: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/research/{research_id}/status")
-async def get_research_status(research_id: UUID) -> Dict[str, Any]:
+@app.get("/research/{research_id}/status", response_model=DetailedResearchStatus)
+async def get_research_status_detailed(research_id: UUID) -> DetailedResearchStatus:
     """
-    Get the status of a research task
+    Get detailed research status with comprehensive progress information
     
-    Returns the current status and any available intermediate results
+    Returns the current status, progress, and all available intermediate results
     """
     
-    status = await research_service.get_research_status(research_id)
-    
-    if status["status"] == "not_found":
-        raise HTTPException(status_code=404, detail="Research ID not found")
+    try:
+        detailed_status = await research_service.get_detailed_status(research_id)
         
-    return status
+        if not detailed_status:
+            raise HTTPException(status_code=404, detail="Research ID not found")
+            
+        return detailed_status
+        
+    except Exception as e:
+        logger.error(f"Error getting research status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/research/{research_id}/result")
 async def get_research_result(research_id: UUID) -> ResearchResult:
@@ -550,6 +560,113 @@ Industry analysts predict the AI agent market will reach $50 billion by 2027. Th
             "error": str(e),
             "message": "Citation test failed, but system is working"
         }
+
+
+# ===== TASK 3.2: ENHANCED API ENDPOINTS =====
+
+@app.get("/research/{research_id}/progress", response_model=ResearchProgress)
+async def get_research_progress(research_id: UUID) -> ResearchProgress:
+    """
+    Get real-time progress information for a research session
+    
+    Returns detailed progress information including stage, percentage, and agent activities
+    """
+    
+    try:
+        progress = await research_service.get_progress(research_id)
+        
+        if not progress:
+            raise HTTPException(status_code=404, detail="Research progress not found")
+            
+        return progress
+        
+    except Exception as e:
+        logger.error(f"Error getting research progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/research/history", response_model=ResearchListResponse)
+async def get_research_history(
+    limit: int = 50,
+    offset: int = 0,
+    status_filter: Optional[ResearchStage] = None
+) -> ResearchListResponse:
+    """
+    Get research history with filtering and pagination
+    
+    Returns a paginated list of research sessions with optional status filtering
+    """
+    
+    try:
+        # Get history items
+        history_items = await research_service.get_research_history(
+            limit=limit, 
+            offset=offset, 
+            status_filter=status_filter
+        )
+        
+        # Get total count for pagination
+        total_count = await research_service.get_research_count(status_filter)
+        
+        # Calculate pagination info
+        page = (offset // limit) + 1
+        has_next = (offset + limit) < total_count
+        has_previous = offset > 0
+        
+        return ResearchListResponse(
+            items=history_items,
+            total_count=total_count,
+            page=page,
+            page_size=limit,
+            has_next=has_next,
+            has_previous=has_previous
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting research history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/research/analytics", response_model=ResearchAnalytics)
+async def get_research_analytics() -> ResearchAnalytics:
+    """
+    Get comprehensive research analytics and performance metrics
+    
+    Returns analytics data including success rates, performance trends, and usage statistics
+    """
+    
+    try:
+        analytics = await research_service.get_research_analytics()
+        return analytics
+        
+    except Exception as e:
+        logger.error(f"Error getting research analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/research/{research_id}/poll", response_model=ProgressPollResponse)
+async def poll_research_progress(
+    research_id: UUID,
+    last_update: Optional[datetime] = None
+) -> ProgressPollResponse:
+    """
+    Optimized polling endpoint with conditional updates
+    
+    Returns progress updates only when there are changes since the last poll
+    """
+    
+    try:
+        poll_response = await research_service.poll_research_progress(
+            research_id=research_id,
+            last_update=last_update
+        )
+        
+        return poll_response
+        
+    except Exception as e:
+        logger.error(f"Error polling research progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/tools/available")
 async def get_available_tools() -> Dict[str, Any]:

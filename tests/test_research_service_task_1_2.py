@@ -277,7 +277,8 @@ class TestResearchServiceTask12:
             assert "failed" in failed_task.message.lower()
             assert failed_task.error == "Test error"
     
-    def test_research_history(self, research_service, sample_query, mock_research_result):
+    @pytest.mark.asyncio
+    async def test_research_history(self, research_service, sample_query, mock_research_result):
         """Test research history functionality"""
         
         # Create some research history
@@ -289,6 +290,7 @@ class TestResearchServiceTask12:
         task1 = ResearchTask(research_id1, sample_query)
         task1.status = ResearchStatus.COMPLETED
         task1.result = mock_research_result
+        task1.result.execution_time = 10.5  # Set execution time
         research_service._completed_research[research_id1] = task1
         
         task2 = ResearchTask(research_id2, sample_query)
@@ -297,25 +299,24 @@ class TestResearchServiceTask12:
         research_service._completed_research[research_id2] = task2
         
         # Get history
-        history = research_service.get_research_history(limit=10)
+        history = await research_service.get_research_history(limit=10)
         
         # Verify history
         assert len(history) == 2
         
         # Check first item (most recent)
         item1 = history[0]
-        assert item1["research_id"] == str(research_id2)
-        assert item1["status"] == "failed"
-        assert item1["query"] == sample_query.query
+        assert str(item1.research_id) == str(research_id2)
+        assert item1.status == "failed"
+        assert item1.query == sample_query.query
         
         # Check second item
         item2 = history[1]
-        assert item2["research_id"] == str(research_id1)
-        assert item2["status"] == "completed"
-        assert "execution_time" in item2
-        assert "sources_count" in item2
-        assert "citations_count" in item2
-        assert "tokens_used" in item2
+        assert str(item2.research_id) == str(research_id1)
+        assert item2.status == "completed"
+        assert item2.execution_time is not None
+        assert hasattr(item2, 'sources_count')
+        assert hasattr(item2, 'tokens_used')
 
 
 if __name__ == "__main__":
