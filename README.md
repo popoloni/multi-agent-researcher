@@ -246,6 +246,36 @@ services:
 - **[Functionalities Registry](http://localhost:12001/repositories/{id}/functionalities)** - Hierarchical code exploration
 - **[Documentation Viewer](http://localhost:12001/repositories/{id}/documentation)** - AI-generated documentation
 
+## 📁 Project Structure
+
+```
+multi-agent-researcher/
+├── app/                          # Backend FastAPI application
+│   ├── api/                      # API endpoints and routers
+│   ├── core/                     # Core business logic and services
+│   ├── models/                   # Database models and schemas
+│   └── utils/                    # Utility functions and helpers
+├── frontend/                     # React frontend application
+│   ├── src/                      # Source code
+│   ├── public/                   # Static assets
+│   └── build/                    # Production build output
+├── docs/                         # Comprehensive documentation
+│   ├── api/                      # API documentation and examples
+│   ├── guides/                   # User guides and tutorials
+│   ├── architecture/             # System architecture documentation
+│   └── reports/                  # Implementation reports and metrics
+├── migration_scripts/            # Database migration and data scripts
+│   ├── database/                 # Database schema migrations
+│   ├── data/                     # Data import/export scripts
+│   └── legacy/                   # Legacy system migration tools
+├── demo/                         # Demo scripts and examples
+├── scripts/                      # Utility and automation scripts
+├── *.sh                         # Startup and management scripts
+├── cleanup.sh                   # Repository cleanup script
+├── cleanup_dev_env.sh           # Development environment cleanup
+└── requirements.txt             # Python dependencies
+```
+
 ## 📚 Documentation
 
 ### 🚀 [Quick Start Guide](docs/guides/quick-start.md)
@@ -258,6 +288,7 @@ Comprehensive documentation including:
 - **[Architecture](docs/architecture/README.md)** - System design and components
 - **[Deployment Guide](docs/guides/deployment.md)** - Production deployment
 - **[Implementation Reports](docs/reports/README.md)** - Development phases and metrics
+- **[Migration Scripts](migration_scripts/README.md)** - Database and data migration tools
 
 ### 📋 [Changelog](CHANGELOG.md)
 See [CHANGELOG.md](CHANGELOG.md) for detailed information about recent improvements and bug fixes.

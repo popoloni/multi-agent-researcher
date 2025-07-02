@@ -7,6 +7,7 @@ import Chat from './pages/Chat';
 import Documentation from './pages/Documentation';
 import FunctionalitiesPage from './pages/FunctionalitiesPage';
 import WebResearch from './pages/WebResearch';
+import Settings from './pages/Settings';
 import Layout from './components/layout/Layout';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { DocumentationProvider } from './contexts/DocumentationContext';
@@ -43,6 +44,7 @@ function App() {
             />
             <Route path="/chat" element={<Chat />} />
             <Route path="/research" element={<WebResearch />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
           </div>
         </Router>

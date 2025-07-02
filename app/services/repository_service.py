@@ -222,7 +222,7 @@ class RepositoryService:
     ):
         """Clone repository with progress tracking"""
         try:
-            # Clone with specific branch
+            # First try to clone with the specified branch
             cmd = ['git', 'clone', '--branch', branch, '--single-branch', clone_url, local_path]
             
             # Run git clone
@@ -246,7 +246,56 @@ class RepositoryService:
             
             if process.returncode != 0:
                 error_msg = stderr.decode() if stderr else "Unknown git error"
-                raise Exception(f"Git clone failed: {error_msg}")
+                
+                # If the specified branch doesn't exist, try common alternatives
+                if "not found" in error_msg.lower() and branch == "main":
+                    logger.warning(f"Branch '{branch}' not found, trying 'master' branch")
+                    await self._update_clone_progress(
+                        repo_id, CloneStatus.CLONING, 25.0,
+                        "Retrying with 'master' branch...", progress_callback
+                    )
+                    
+                    # Try with master branch
+                    cmd_master = ['git', 'clone', '--branch', 'master', '--single-branch', clone_url, local_path]
+                    process_master = await asyncio.create_subprocess_exec(
+                        *cmd_master,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    
+                    # Monitor progress for retry
+                    for i, progress in enumerate(progress_steps):
+                        await asyncio.sleep(0.5)
+                        await self._update_clone_progress(
+                            repo_id, CloneStatus.CLONING, progress,
+                            f"Downloading repository files (master branch)... ({i+1}/{len(progress_steps)})",
+                            progress_callback
+                        )
+                    
+                    stdout_master, stderr_master = await process_master.communicate()
+                    
+                    if process_master.returncode != 0:
+                        # If master also fails, try cloning without specifying branch
+                        logger.warning("Master branch also failed, trying default branch")
+                        await self._update_clone_progress(
+                            repo_id, CloneStatus.CLONING, 25.0,
+                            "Retrying with default branch...", progress_callback
+                        )
+                        
+                        cmd_default = ['git', 'clone', clone_url, local_path]
+                        process_default = await asyncio.create_subprocess_exec(
+                            *cmd_default,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE
+                        )
+                        
+                        stdout_default, stderr_default = await process_default.communicate()
+                        
+                        if process_default.returncode != 0:
+                            error_msg_default = stderr_default.decode() if stderr_default else "Unknown git error"
+                            raise Exception(f"Git clone failed with all branch attempts: {error_msg_default}")
+                else:
+                    raise Exception(f"Git clone failed: {error_msg}")
                 
         except Exception as e:
             logger.error(f"Clone with progress failed: {str(e)}")

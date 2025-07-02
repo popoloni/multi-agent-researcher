@@ -75,10 +75,17 @@ const Header = () => {
             <User className="w-4 h-4" />
             <span>Research Agent</span>
           </div>
-          <div className="flex items-center space-x-2">
+          <Link 
+            to="/settings" 
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/settings') 
+                ? 'bg-primary-100 text-primary-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
             <Settings className="w-4 h-4" />
             <span>Settings</span>
-          </div>
+          </Link>
         </div>
       </div>
     </header>

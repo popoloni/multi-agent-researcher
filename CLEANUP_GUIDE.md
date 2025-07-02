@@ -15,11 +15,32 @@ chmod +x cleanup.sh
 ./cleanup.sh
 ```
 
+### Development Environment Cleanup
+For more aggressive cleanup including virtual environments and IDE settings:
+```bash
+# Make the script executable (first time only)
+chmod +x cleanup_dev_env.sh
+
+# Run with confirmations (recommended)
+./cleanup_dev_env.sh
+
+# Run without confirmations (use with caution)
+./cleanup_dev_env.sh --force
+```
+
 ### When to Use
+
+#### Regular Cleanup (`cleanup.sh`)
 - **Before committing**: Ensure no temporary files are accidentally committed
 - **After development sessions**: Clean up generated files and logs
 - **Before creating releases**: Ensure a clean repository state
 - **When repository size grows**: Remove unnecessary build artifacts
+
+#### Development Environment Cleanup (`cleanup_dev_env.sh`)
+- **When switching between projects**: Clean up project-specific configurations
+- **Before sharing the repository**: Remove personal IDE and environment settings
+- **When troubleshooting environment issues**: Start with a clean development setup
+- **Before creating a fresh development environment**: Remove old virtual environments and caches
 
 ## 🗂️ What Gets Cleaned
 

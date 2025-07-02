@@ -33,6 +33,7 @@ from app.services.github_service import github_service, GitHubService
 from app.services.rag_service import RAGService
 from app.services.chat_history_service import ChatHistoryService
 from app.services.monitoring_service import monitoring_service
+from app.api.settings import router as settings_router
 from app.core.config import settings
 import logging
 
@@ -53,6 +54,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API routers
+app.include_router(settings_router)
 
 # Mount static files for React frontend
 frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "build")
