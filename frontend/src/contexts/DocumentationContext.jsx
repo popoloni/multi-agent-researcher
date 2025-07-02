@@ -12,9 +12,31 @@ export const useDocumentation = () => {
 };
 
 export const DocumentationProvider = ({ children }) => {
-  // Global documentation state
-  const [documentationCache, setDocumentationCache] = useState(new Map());
+  // Global documentation state with persistence
+  const [documentationCache, setDocumentationCache] = useState(() => {
+    // Initialize from localStorage if available
+    try {
+      const stored = localStorage.getItem('documentationCache');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return new Map(Object.entries(parsed));
+      }
+    } catch (e) {
+      console.warn('Failed to load documentation cache from localStorage:', e);
+    }
+    return new Map();
+  });
   const [generationStatus, setGenerationStatus] = useState(new Map());
+
+  // Persist cache to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      const cacheObject = Object.fromEntries(documentationCache);
+      localStorage.setItem('documentationCache', JSON.stringify(cacheObject));
+    } catch (e) {
+      console.warn('Failed to persist documentation cache to localStorage:', e);
+    }
+  }, [documentationCache]);
 
   // Get documentation for a repository
   const getDocumentation = async (repositoryId, branch = 'main', forceRefresh = false) => {
@@ -95,7 +117,36 @@ export const DocumentationProvider = ({ children }) => {
   // Get cached documentation without API call
   const getCachedDocumentation = (repositoryId, branch = 'main') => {
     const cacheKey = `${repositoryId}_${branch}`;
-    return documentationCache.get(cacheKey) || null;
+    const cached = documentationCache.get(cacheKey);
+    
+    // If not found in memory cache, try to recover from service cache
+    if (!cached) {
+      try {
+        const serviceCache = documentationService.getCache(repositoryId);
+        if (serviceCache) {
+          console.log('Recovering documentation from service cache');
+          const recoveredData = {
+            documentation: serviceCache,
+            lastGenerated: new Date().toISOString(),
+            status: 'generated'
+          };
+          
+          // Update context cache
+          setDocumentationCache(prev => new Map(prev.set(cacheKey, recoveredData)));
+          return recoveredData;
+        }
+      } catch (e) {
+        console.warn('Failed to recover from service cache:', e);
+      }
+    }
+    
+    return cached || null;
+  };
+
+  // Force refresh documentation from API
+  const refreshDocumentation = async (repositoryId, branch = 'main') => {
+    console.log('Force refreshing documentation for:', repositoryId);
+    return await getDocumentation(repositoryId, branch, true);
   };
 
   // Set generation status
@@ -114,6 +165,7 @@ export const DocumentationProvider = ({ children }) => {
     setDocumentation,
     clearDocumentation,
     getCachedDocumentation,
+    refreshDocumentation,
     
     // Generation status methods
     setDocumentationGenerationStatus,

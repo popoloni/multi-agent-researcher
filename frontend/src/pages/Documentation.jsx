@@ -21,7 +21,8 @@ const Documentation = () => {
   const { 
     getDocumentation, 
     setDocumentation: setContextDocumentation, 
-    getCachedDocumentation 
+    getCachedDocumentation,
+    refreshDocumentation
   } = useDocumentation();
   
   // Get docType from URL query params
@@ -54,17 +55,44 @@ const Documentation = () => {
     }
   }, [repositoryId, selectedBranch]);
 
-  // Load documentation when returning to the page
+  // Load documentation when returning to the page or when component mounts
   useEffect(() => {
     const handleFocus = () => {
-      if (repositoryId && docStatus === 'generated') {
+      if (repositoryId) {
+        console.log('Window focus detected, checking documentation state');
+        loadDocumentationFromContext();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && repositoryId) {
+        console.log('Page visibility changed, checking documentation state');
         loadDocumentationFromContext();
       }
     };
 
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [repositoryId, docStatus]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [repositoryId]);
+
+  // Recovery mechanism when returning from navigation
+  useEffect(() => {
+    if (repositoryId && Object.keys(documentation).length === 0) {
+      console.log('Documentation empty, attempting recovery');
+      const cached = getCachedDocumentation(repositoryId, selectedBranch);
+      if (cached && cached.documentation && Object.keys(cached.documentation).length > 0) {
+        console.log('Recovered documentation from cache');
+        setDocumentation(cached.documentation);
+        setDocStatus(cached.status);
+        setLastGenerated(cached.lastGenerated);
+      }
+    }
+  }, [repositoryId, documentation, getCachedDocumentation, selectedBranch]);
 
   // Handle tab changes
   useEffect(() => {
@@ -104,30 +132,49 @@ const Documentation = () => {
     try {
       console.log('Loading documentation from context for:', repositoryId);
       
-      // First check if we have cached documentation
+      // First check if we have cached documentation (with recovery mechanism)
       const cached = getCachedDocumentation(repositoryId, selectedBranch);
       if (cached && cached.documentation && Object.keys(cached.documentation).length > 0) {
         console.log('Found cached documentation in context');
         setDocumentation(cached.documentation);
-        setDocStatus(cached.status);
+        setDocStatus(cached.status || 'generated');
         setLastGenerated(cached.lastGenerated);
         loadFunctionalities();
         return;
       }
       
       // If no cache, fetch from API via context
+      console.log('No cache found, fetching from API');
       const result = await getDocumentation(repositoryId, selectedBranch);
       
       if (result && result.documentation && Object.keys(result.documentation).length > 0) {
         console.log('Documentation loaded from API via context');
         setDocumentation(result.documentation);
-        setDocStatus(result.status);
+        setDocStatus(result.status || 'generated');
         setLastGenerated(result.lastGenerated);
         loadFunctionalities();
       } else {
-        console.log('No documentation found');
-        setDocStatus('not_generated');
-        setDocumentation({});
+        console.log('No documentation found, checking if it exists but failed to load');
+        
+        // Try one more time with force refresh as last resort
+        try {
+          const refreshResult = await refreshDocumentation(repositoryId, selectedBranch);
+          if (refreshResult && refreshResult.documentation && Object.keys(refreshResult.documentation).length > 0) {
+            console.log('Documentation recovered via force refresh');
+            setDocumentation(refreshResult.documentation);
+            setDocStatus(refreshResult.status || 'generated');
+            setLastGenerated(refreshResult.lastGenerated);
+            loadFunctionalities();
+          } else {
+            console.log('No documentation found after refresh');
+            setDocStatus('not_generated');
+            setDocumentation({});
+          }
+        } catch (refreshErr) {
+          console.warn('Force refresh failed:', refreshErr);
+          setDocStatus('not_generated');
+          setDocumentation({});
+        }
       }
     } catch (err) {
       console.error('Error loading documentation from context:', err);

@@ -1886,10 +1886,17 @@ async def get_documentation(repository_id: str, branch: str = "main") -> Dict[st
             try:
                 import json
                 if isinstance(documentation_content, str):
+                    # Try to parse as JSON
                     documentation_content = json.loads(documentation_content)
-            except (json.JSONDecodeError, TypeError):
-                # If parsing fails, keep as string
-                pass
+                    logger.info(f"Successfully parsed documentation JSON for repository {repository_id}")
+                elif not isinstance(documentation_content, dict):
+                    # If it's not a string or dict, something is wrong
+                    logger.warning(f"Unexpected documentation content type for repository {repository_id}: {type(documentation_content)}")
+                    documentation_content = {}
+            except (json.JSONDecodeError, TypeError) as e:
+                # If parsing fails, log the error and return empty dict
+                logger.error(f"Failed to parse documentation JSON for repository {repository_id}: {e}")
+                documentation_content = {}
                 
             return {
                 "documentation": documentation_content,
