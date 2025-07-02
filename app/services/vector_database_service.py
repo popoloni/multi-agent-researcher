@@ -466,7 +466,8 @@ class VectorDatabaseService:
             """)
             params.append(limit)
             
-            async with self.db_service.session_factory() as session:
+            session = self.db_service.session_factory()
+            try:
                 result = await session.execute(sql, tuple(params))
                 rows = result.fetchall()
                 
@@ -486,6 +487,8 @@ class VectorDatabaseService:
                     )
                     for row in rows
                 ]
+            finally:
+                await session.close()
                 
         except Exception as e:
             logger.error(f"Keyword search failed: {e}")

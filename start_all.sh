@@ -1,5 +1,50 @@
 #!/bin/bash
+set -e  # Exit on any error
+
 echo "🚀 Multi-Agent Researcher Control Script"
+
+# Check if we're on a supported platform
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+    echo "⚠️  Windows detected. For better Windows support, use:"
+    echo "   start_all.bat or python start_all.py"
+    echo ""
+fi
+
+# Function to check dependencies
+check_dependencies() {
+    local missing_deps=()
+    
+    # Check for required commands
+    if ! command -v curl &> /dev/null; then
+        missing_deps+=("curl")
+    fi
+    
+    if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
+        missing_deps+=("python3")
+    fi
+    
+    if ! command -v npm &> /dev/null; then
+        missing_deps+=("npm")
+    fi
+    
+    if ! command -v ollama &> /dev/null; then
+        missing_deps+=("ollama")
+    fi
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        echo "❌ Missing dependencies: ${missing_deps[*]}"
+        echo "   Please install the missing dependencies and try again."
+        echo ""
+        echo "   Installation guides:"
+        echo "   - Python: https://www.python.org/downloads/"
+        echo "   - Node.js/npm: https://nodejs.org/"
+        echo "   - Ollama: https://ollama.ai/"
+        echo "   - curl: Usually pre-installed on most systems"
+        return 1
+    fi
+    
+    return 0
+}
 
 # Configuration
 OLLAMA_PORT=11434
@@ -137,6 +182,12 @@ restart_services() {
 # Function to start all services
 start_services() {
     echo "🚀 Starting all services..."
+    
+    # Check dependencies first
+    if ! check_dependencies; then
+        echo "❌ Dependency check failed. Cannot start services."
+        exit 1
+    fi
     
     # Start backend and Ollama if not already running
     if ! check_service "Backend API" $API_PORT "health" || ! check_service "Ollama" $OLLAMA_PORT "api/version"; then

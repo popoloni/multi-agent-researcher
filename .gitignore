@@ -23,6 +23,7 @@ MANIFEST
 
 # Virtual Environment
 researcher-venv/
+researcher-env/
 venv/
 env/
 ENV/

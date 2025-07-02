@@ -91,7 +91,7 @@ class ChatHistoryService:
             # For testing purposes, we'll make this more robust
             try:
                 # Save to database
-                session = await self.db_service.session_factory()
+                session = self.db_service.session_factory()
                 try:
                     chat_message = ChatMessage(
                         id=message_data["id"],
@@ -225,7 +225,7 @@ class ChatHistoryService:
         try:
             # For testing purposes, we'll make this more robust
             try:
-                session = await self.db_service.session_factory()
+                session = self.db_service.session_factory()
                 try:
                     if session_id:
                         # Delete specific conversation
@@ -349,7 +349,7 @@ class ChatHistoryService:
             conversation_id = str(uuid.uuid4())
             
             try:
-                session = await self.db_service.session_factory()
+                session = self.db_service.session_factory()
                 try:
                     chat_conversation = ChatConversation(
                         id=conversation_id,
@@ -395,7 +395,7 @@ class ChatHistoryService:
     ) -> Optional[Dict[str, Any]]:
         """Get a specific conversation by session ID"""
         try:
-            session = await self.db_service.session_factory()
+            session = self.db_service.session_factory()
             try:
                 result = await session.execute(
                     text("""
@@ -432,7 +432,7 @@ class ChatHistoryService:
     ) -> Optional[Dict[str, Any]]:
         """Get the latest conversation for a repository"""
         try:
-            session = await self.db_service.session_factory()
+            session = self.db_service.session_factory()
             try:
                 result = await session.execute(
                     text("""
@@ -471,7 +471,7 @@ class ChatHistoryService:
     ) -> List[Dict[str, Any]]:
         """Get all conversations for a repository"""
         try:
-            session = await self.db_service.session_factory()
+            session = self.db_service.session_factory()
             try:
                 result = await session.execute(
                     text("""
@@ -509,7 +509,7 @@ class ChatHistoryService:
     ) -> List[Dict[str, Any]]:
         """Get messages for a conversation"""
         try:
-            session = await self.db_service.session_factory()
+            session = self.db_service.session_factory()
             try:
                 result = await session.execute(
                     text("""

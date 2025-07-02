@@ -32,6 +32,7 @@ from app.services.research_service import ResearchService
 from app.services.github_service import github_service, GitHubService
 from app.services.rag_service import RAGService
 from app.services.chat_history_service import ChatHistoryService
+from app.services.monitoring_service import monitoring_service
 from app.core.config import settings
 import logging
 
@@ -1480,6 +1481,16 @@ Provide a 1-2 sentence description of what this function does, its purpose, and 
                                 "line": func.start_line,
                                 "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
                             })
+                    
+                    except Exception as e:
+                        # Fallback for outer try block
+                        functions_with_descriptions.append({
+                            "name": func.name,
+                            "description": f"Function {func.name} defined in {func.file_path} (analysis failed: {str(e)[:50]})",
+                            "file": func.file_path,
+                            "line": func.start_line,
+                            "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
+                        })
 
                 # Update progress: Generating class descriptions
                 documentation_generation_storage[task_id].update({
@@ -1550,6 +1561,16 @@ Provide a 1-2 sentence description of what this class represents and its main pu
                                 "line": cls.start_line,
                                 "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
                             })
+                    
+                    except Exception as e:
+                        # Fallback for outer try block
+                        classes_with_descriptions.append({
+                            "name": cls.name,
+                            "description": f"Class/structure {cls.name} defined in {cls.file_path} (analysis failed: {str(e)[:50]})",
+                            "file": cls.file_path,
+                            "line": cls.start_line,
+                            "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
+                        })
 
                 # Update progress: Generating overview
                 documentation_generation_storage[task_id].update({
@@ -3526,6 +3547,111 @@ async def get_repository_branches(repository_id: str) -> Dict[str, Any]:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get branches: {str(e)}")
+
+# Monitoring and Health Check Endpoints
+@app.get("/api/monitoring/health")
+async def health_check():
+    """Comprehensive health check endpoint"""
+    try:
+        health_status = monitoring_service.check_health()
+        status_code = 200 if health_status['status'] == 'healthy' else 503
+        return JSONResponse(content=health_status, status_code=status_code)
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return JSONResponse(
+            content={
+                'status': 'error',
+                'timestamp': datetime.now().isoformat(),
+                'error': str(e)
+            },
+            status_code=503
+        )
+
+@app.get("/api/monitoring/metrics")
+async def get_system_metrics():
+    """Get current system performance metrics"""
+    try:
+        metrics = await monitoring_service.collect_system_metrics()
+        return {
+            "status": "success",
+            "metrics": {
+                "timestamp": metrics.timestamp.isoformat(),
+                "cpu_usage": metrics.cpu_usage,
+                "memory_usage": metrics.memory_usage,
+                "disk_usage": metrics.disk_usage,
+                "response_time": metrics.response_time,
+                "active_connections": metrics.active_connections,
+                "error_rate": metrics.error_rate,
+                "throughput": metrics.throughput
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get system metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/monitoring/performance")
+async def get_performance_summary(hours: int = 24):
+    """Get performance summary for specified time period"""
+    try:
+        summary = monitoring_service.get_performance_summary(hours)
+        return {
+            "status": "success",
+            "summary": summary
+        }
+    except Exception as e:
+        logger.error(f"Failed to get performance summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/monitoring/recommendations")
+async def get_optimization_recommendations():
+    """Get optimization recommendations based on current metrics"""
+    try:
+        recommendations = monitoring_service.get_optimization_recommendations()
+        return {
+            "status": "success",
+            "recommendations": recommendations
+        }
+    except Exception as e:
+        logger.error(f"Failed to get optimization recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/monitoring/dashboard")
+async def get_monitoring_dashboard():
+    """Get comprehensive monitoring dashboard data"""
+    try:
+        # Collect current metrics
+        current_metrics = await monitoring_service.collect_system_metrics()
+        
+        # Get performance summary
+        performance_summary = monitoring_service.get_performance_summary(24)
+        
+        # Get health status
+        health_status = monitoring_service.check_health()
+        
+        # Get optimization recommendations
+        recommendations = monitoring_service.get_optimization_recommendations()
+        
+        return {
+            "status": "success",
+            "dashboard": {
+                "current_metrics": {
+                    "timestamp": current_metrics.timestamp.isoformat(),
+                    "cpu_usage": current_metrics.cpu_usage,
+                    "memory_usage": current_metrics.memory_usage,
+                    "disk_usage": current_metrics.disk_usage,
+                    "response_time": current_metrics.response_time,
+                    "error_rate": current_metrics.error_rate,
+                    "throughput": current_metrics.throughput
+                },
+                "performance_summary": performance_summary,
+                "health_status": health_status,
+                "recommendations": recommendations,
+                "uptime": str(datetime.now() - monitoring_service.start_time)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get monitoring dashboard: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Catch-all route for React Router (SPA) - MUST BE LAST
 @app.get("/{path:path}", response_class=HTMLResponse)

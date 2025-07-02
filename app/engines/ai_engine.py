@@ -282,6 +282,9 @@ class AIEngine:
         self.model_manager = model_manager
         self.analysis_cache: Dict[str, AnalysisResult] = {}
         self.prompt_templates = AIPromptTemplates()
+        # Default model attributes for compatibility
+        self.model_name = settings.LEAD_AGENT_MODEL if hasattr(settings, 'LEAD_AGENT_MODEL') else 'llama3.2:1b'
+        self.provider_name = settings.AI_PROVIDER if hasattr(settings, 'AI_PROVIDER') else 'ollama'
     
     def _select_model(self, complexity: ModelComplexity, analysis_type: AnalysisType) -> str:
         """Select the best model for the given complexity and analysis type"""

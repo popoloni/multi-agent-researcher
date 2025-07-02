@@ -16,3 +16,4 @@ spacy
 aiosqlite
 sqlalchemy
 greenlet
+psutil
