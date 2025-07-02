@@ -1428,7 +1428,7 @@ async def generate_documentation(repository_id: str, background_tasks: Backgroun
                             "current_stage": f"analyzing_function_{func.name}"
                         })
 
-                        # Use Ollama to generate function description
+                        # Use configured AI provider to generate function description
                         description_prompt = f"""Analyze this {analysis.repository.language.value} function and provide a concise, helpful description of what it does:
 
 Function Name: {func.name}
@@ -1438,51 +1438,48 @@ Code:
 
 Provide a 1-2 sentence description of what this function does, its purpose, and key parameters if visible."""
                         
-                        # Call Ollama for description
-                        import httpx
-                        async with httpx.AsyncClient() as client:
-                            ollama_response = await client.post(
-                                "http://localhost:11434/api/generate",
-                                json={
-                                    "model": "llama3.2:1b",
-                                    "prompt": description_prompt,
-                                    "stream": False
-                                },
-                                timeout=30.0
+                        # Call configured AI provider for description
+                        try:
+                            from app.core.model_providers import model_manager
+                            from app.core.config import settings
+                            
+                            ai_description, _ = await model_manager.call_model(
+                                model=settings.DOCUMENTATION_MODEL,
+                                messages=[{"role": "user", "content": description_prompt}],
+                                max_tokens=200,
+                                temperature=0.7
                             )
                             
-                            if ollama_response.status_code == 200:
-                                response_data = ollama_response.json()
-                                ai_description = response_data.get("response", "").strip()
-                                # Clean up the response
-                                if ai_description and len(ai_description) > 10:
-                                    functions_with_descriptions.append({
-                                        "name": func.name,
-                                        "description": ai_description,
-                                        "file": func.file_path,
-                                        "line": func.start_line,
-                                        "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
-                                    })
-                                    continue
+                            # Clean up the response
+                            ai_description = ai_description.strip()
+                            if ai_description and len(ai_description) > 10:
+                                functions_with_descriptions.append({
+                                    "name": func.name,
+                                    "description": ai_description,
+                                    "file": func.file_path,
+                                    "line": func.start_line,
+                                    "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
+                                })
+                                continue
                             
-                        # Fallback if AI fails
-                        functions_with_descriptions.append({
-                            "name": func.name,
-                            "description": f"Function {func.name} defined in {func.file_path}",
-                            "file": func.file_path,
-                            "line": func.start_line,
-                            "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
-                        })
+                            # Fallback if AI response is too short
+                            functions_with_descriptions.append({
+                                "name": func.name,
+                                "description": f"Function {func.name} defined in {func.file_path}",
+                                "file": func.file_path,
+                                "line": func.start_line,
+                                "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
+                            })
                             
-                    except Exception as e:
-                        # Fallback description if AI generation fails
-                        functions_with_descriptions.append({
-                            "name": func.name,
-                            "description": f"Function {func.name} defined in {func.file_path}",
-                            "file": func.file_path,
-                            "line": func.start_line,
-                            "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
-                        })
+                        except Exception as e:
+                            # Fallback description if AI generation fails
+                            functions_with_descriptions.append({
+                                "name": func.name,
+                                "description": f"Function {func.name} defined in {func.file_path} (AI generation failed: {str(e)[:50]})",
+                                "file": func.file_path,
+                                "line": func.start_line,
+                                "code_snippet": func.code_snippet[:150] + "..." if len(func.code_snippet) > 150 else func.code_snippet
+                            })
 
                 # Update progress: Generating class descriptions
                 documentation_generation_storage[task_id].update({
@@ -1501,7 +1498,7 @@ Provide a 1-2 sentence description of what this function does, its purpose, and 
                             "current_stage": f"analyzing_class_{cls.name}"
                         })
 
-                        # Use Ollama to generate class description
+                        # Use configured AI provider to generate class description
                         description_prompt = f"""Analyze this {analysis.repository.language.value} class/structure and provide a concise description:
 
 Class Name: {cls.name}
@@ -1511,50 +1508,48 @@ Code:
 
 Provide a 1-2 sentence description of what this class represents and its main purpose."""
                         
-                        # Call Ollama for description
-                        import httpx
-                        async with httpx.AsyncClient() as client:
-                            ollama_response = await client.post(
-                                "http://localhost:11434/api/generate",
-                                json={
-                                    "model": "llama3.2:1b",
-                                    "prompt": description_prompt,
-                                    "stream": False
-                                },
-                                timeout=30.0
+                        # Call configured AI provider for description
+                        try:
+                            from app.core.model_providers import model_manager
+                            from app.core.config import settings
+                            
+                            ai_description, _ = await model_manager.call_model(
+                                model=settings.DOCUMENTATION_MODEL,
+                                messages=[{"role": "user", "content": description_prompt}],
+                                max_tokens=200,
+                                temperature=0.7
                             )
                             
-                            if ollama_response.status_code == 200:
-                                response_data = ollama_response.json()
-                                ai_description = response_data.get("response", "").strip()
-                                if ai_description and len(ai_description) > 10:
-                                    classes_with_descriptions.append({
-                                        "name": cls.name,
-                                        "description": ai_description,
-                                        "file": cls.file_path,
-                                        "line": cls.start_line,
-                                        "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
-                                    })
-                                    continue
+                            # Clean up the response
+                            ai_description = ai_description.strip()
+                            if ai_description and len(ai_description) > 10:
+                                classes_with_descriptions.append({
+                                    "name": cls.name,
+                                    "description": ai_description,
+                                    "file": cls.file_path,
+                                    "line": cls.start_line,
+                                    "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
+                                })
+                                continue
                             
-                        # Fallback if AI fails
-                        classes_with_descriptions.append({
-                            "name": cls.name,
-                            "description": f"Class/structure {cls.name} defined in {cls.file_path}",
-                            "file": cls.file_path,
-                            "line": cls.start_line,
-                            "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
-                        })
+                            # Fallback if AI response is too short
+                            classes_with_descriptions.append({
+                                "name": cls.name,
+                                "description": f"Class/structure {cls.name} defined in {cls.file_path}",
+                                "file": cls.file_path,
+                                "line": cls.start_line,
+                                "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
+                            })
                             
-                    except Exception as e:
-                        # Fallback description
-                        classes_with_descriptions.append({
-                            "name": cls.name,
-                            "description": f"Class/structure {cls.name} defined in {cls.file_path}",
-                            "file": cls.file_path,
-                            "line": cls.start_line,
-                            "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
-                        })
+                        except Exception as e:
+                            # Fallback description if AI generation fails
+                            classes_with_descriptions.append({
+                                "name": cls.name,
+                                "description": f"Class/structure {cls.name} defined in {cls.file_path} (AI generation failed: {str(e)[:50]})",
+                                "file": cls.file_path,
+                                "line": cls.start_line,
+                                "code_snippet": cls.code_snippet[:150] + "..." if len(cls.code_snippet) > 150 else cls.code_snippet
+                            })
 
                 # Update progress: Generating overview
                 documentation_generation_storage[task_id].update({
@@ -1584,26 +1579,18 @@ Generate a comprehensive overview including:
 
 Make it professional and informative."""
 
-                # Generate AI overview
+                # Generate AI overview using configured provider
                 try:
-                    import httpx
-                    async with httpx.AsyncClient() as client:
-                        # Generate overview
-                        ollama_response = await client.post(
-                            "http://localhost:11434/api/generate",
-                            json={
-                                "model": "llama3.2:1b",
-                                "prompt": overview_prompt,
-                                "stream": False
-                            },
-                            timeout=45.0
-                        )
-                        
-                        if ollama_response.status_code == 200:
-                            response_data = ollama_response.json()
-                            ai_overview = response_data.get("response", "").strip()
-                        else:
-                            ai_overview = ""
+                    from app.core.model_providers import model_manager
+                    from app.core.config import settings
+                    
+                    ai_overview, _ = await model_manager.call_model(
+                        model=settings.DOCUMENTATION_MODEL,
+                        messages=[{"role": "user", "content": overview_prompt}],
+                        max_tokens=2000,
+                        temperature=0.7
+                    )
+                    ai_overview = ai_overview.strip()
 
                 except Exception as e:
                     ai_overview = ""
@@ -1640,25 +1627,19 @@ Create a detailed architecture analysis covering:
 
 Provide specific insights about the codebase structure and architectural decisions."""
 
-                # Generate AI architecture analysis
+                # Generate AI architecture analysis using configured provider
                 try:
-                    import httpx
-                    async with httpx.AsyncClient() as client:
-                        ollama_response = await client.post(
-                            "http://localhost:11434/api/generate",
-                            json={
-                                "model": "llama3.2:1b",
-                                "prompt": architecture_prompt,
-                                "stream": False
-                            },
-                            timeout=60.0
-                        )
-                        
-                        if ollama_response.status_code == 200:
-                            response_data = ollama_response.json()
-                            ai_architecture = response_data.get("response", "").strip()
-                        else:
-                            ai_architecture = ""
+                    from app.core.model_providers import model_manager
+                    from app.core.config import settings
+                    
+                    ai_architecture, _ = await model_manager.call_model(
+                        model=settings.DOCUMENTATION_MODEL,
+                        messages=[{"role": "user", "content": architecture_prompt}],
+                        max_tokens=2000,
+                        temperature=0.7
+                    )
+                    ai_architecture = ai_architecture.strip()
+                    
                 except Exception as e:
                     ai_architecture = ""
 
@@ -1692,25 +1673,19 @@ Create a detailed user guide that includes:
 
 Make it practical and actionable for users who want to actually use this repository."""
 
-                # Generate AI user guide
+                # Generate AI user guide using configured provider
                 try:
-                    import httpx
-                    async with httpx.AsyncClient() as client:
-                        ollama_response = await client.post(
-                            "http://localhost:11434/api/generate",
-                            json={
-                                "model": "llama3.2:1b",
-                                "prompt": user_guide_prompt,
-                                "stream": False
-                            },
-                            timeout=60.0
-                        )
-                        
-                        if ollama_response.status_code == 200:
-                            response_data = ollama_response.json()
-                            ai_user_guide = response_data.get("response", "").strip()
-                        else:
-                            ai_user_guide = ""
+                    from app.core.model_providers import model_manager
+                    from app.core.config import settings
+                    
+                    ai_user_guide, _ = await model_manager.call_model(
+                        model=settings.DOCUMENTATION_MODEL,
+                        messages=[{"role": "user", "content": user_guide_prompt}],
+                        max_tokens=2000,
+                        temperature=0.7
+                    )
+                    ai_user_guide = ai_user_guide.strip()
+                    
                 except Exception as e:
                     ai_user_guide = ""
 

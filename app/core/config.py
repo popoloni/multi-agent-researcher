@@ -8,7 +8,7 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./kenobi.db")
     
     # AI Provider Configuration
-    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "ollama")  # Default to ollama, can be "anthropic"
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "anthropic")  # Default to anthropic, can be "ollama"
     
     # API Keys
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
