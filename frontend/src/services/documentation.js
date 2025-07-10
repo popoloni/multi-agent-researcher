@@ -121,7 +121,7 @@ class DocumentationService {
       if (response.data && response.data.documentation) {
         const docString = response.data.documentation;
         
-        // Parse JSON string
+        // Parse JSON string if needed
         let docData;
         if (typeof docString === 'string') {
           try {
@@ -140,6 +140,15 @@ class DocumentationService {
           this.setCache(repositoryId, docData);
           console.log('Documentation cached');
         }
+        
+        // Return response with parsed documentation
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            documentation: docData
+          }
+        };
       }
       
       return response;
@@ -172,6 +181,24 @@ class DocumentationService {
     return api.get(`/kenobi/repositories/${repositoryId}/analysis`, {
       params: { branch }
     });
+  }
+
+  // Delete documentation
+  async deleteDocumentation(repositoryId, branch = 'main') {
+    console.log('Deleting documentation for:', repositoryId);
+    
+    try {
+      const response = await api.delete(`/kenobi/repositories/${repositoryId}/documentation?branch=${branch}`);
+      
+      // Clear cache
+      this.clearCache(repositoryId);
+      
+      console.log('Documentation deleted successfully');
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting documentation:', error);
+      throw error;
+    }
   }
 }
 

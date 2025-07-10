@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Printer, Download, Copy, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Printer, Download, Copy, Search, ChevronDown, ChevronUp, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -11,14 +11,19 @@ const DocumentationViewer = ({
   title, 
   docType = 'overview',
   isLoading = false,
-  onSearch,
   onPrint,
   onDownload
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showToc, setShowToc] = useState(true);
   const [toc, setToc] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [highlightedContent, setHighlightedContent] = useState('');
   const contentRef = useRef(null);
+
+  // Use highlighted content or original content
+  const displayContent = highlightedContent || content;
 
   // Extract table of contents from markdown content
   useEffect(() => {
@@ -38,11 +43,101 @@ const DocumentationViewer = ({
     }
   }, [content]);
 
+  // Perform client-side search
+  const performSearch = (term) => {
+    if (!term || !content) {
+      setSearchResults([]);
+      setHighlightedContent('');
+      setCurrentMatchIndex(0);
+      return;
+    }
+
+    // Find all matches (case-insensitive)
+    const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const matches = [...content.matchAll(regex)];
+    
+    if (matches.length === 0) {
+      setSearchResults([]);
+      setHighlightedContent('');
+      setCurrentMatchIndex(0);
+      return;
+    }
+
+    // Create search results with context
+    const results = matches.map((match, index) => {
+      const start = Math.max(0, match.index - 50);
+      const end = Math.min(content.length, match.index + match[0].length + 50);
+      const context = content.slice(start, end);
+      
+      return {
+        index,
+        match: match[0],
+        position: match.index,
+        context: context,
+        beforeMatch: content.slice(start, match.index),
+        afterMatch: content.slice(match.index + match[0].length, end)
+      };
+    });
+
+    setSearchResults(results);
+    setCurrentMatchIndex(0);
+
+    // Highlight matches in content
+    let highlightedText = content;
+    let offset = 0;
+    
+    matches.forEach((match, index) => {
+      const position = match.index + offset;
+      const beforeMatch = highlightedText.slice(0, position);
+      const matchText = match[0];
+      const afterMatch = highlightedText.slice(position + matchText.length);
+      
+      const highlightedMatch = `<mark class="bg-yellow-200 px-1 rounded" id="search-match-${index}">${matchText}</mark>`;
+      highlightedText = beforeMatch + highlightedMatch + afterMatch;
+      offset += highlightedMatch.length - matchText.length;
+    });
+
+    setHighlightedContent(highlightedText);
+    
+    // Scroll to first match
+    setTimeout(() => {
+      const firstMatch = document.getElementById('search-match-0');
+      if (firstMatch) {
+        firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  };
+
   // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
-    if (onSearch && searchTerm) {
-      onSearch(searchTerm);
+    performSearch(searchTerm);
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm('');
+    setSearchResults([]);
+    setHighlightedContent('');
+    setCurrentMatchIndex(0);
+  };
+
+  // Navigate to next/previous match
+  const navigateMatch = (direction) => {
+    if (searchResults.length === 0) return;
+    
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = (currentMatchIndex + 1) % searchResults.length;
+    } else {
+      newIndex = currentMatchIndex === 0 ? searchResults.length - 1 : currentMatchIndex - 1;
+    }
+    
+    setCurrentMatchIndex(newIndex);
+    
+    const matchElement = document.getElementById(`search-match-${newIndex}`);
+    if (matchElement) {
+      matchElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
@@ -205,9 +300,58 @@ const DocumentationViewer = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search in documentation..."
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="w-full pl-10 pr-32 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
+          
+          {/* Search Controls */}
+          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+            {searchResults.length > 0 && (
+              <>
+                <span className="text-xs text-gray-500">
+                  {currentMatchIndex + 1} of {searchResults.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigateMatch('previous')}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                  title="Previous match"
+                >
+                  <ChevronUp className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateMatch('next')}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                  title="Next match"
+                >
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </>
+            )}
+            
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="p-1 text-gray-400 hover:text-gray-600"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </form>
+        
+        {/* Search Results Summary */}
+        {searchTerm && (
+          <div className="mt-2 text-sm text-gray-500">
+            {searchResults.length > 0 ? (
+              <>Found {searchResults.length} {searchResults.length === 1 ? 'match' : 'matches'} for "{searchTerm}"</>
+            ) : (
+              <>No matches found for "{searchTerm}"</>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col md:flex-row">
@@ -252,7 +396,7 @@ const DocumentationViewer = ({
             rehypePlugins={[rehypeRaw]}
             components={components}
           >
-            {content}
+            {displayContent}
           </ReactMarkdown>
         </div>
       </div>

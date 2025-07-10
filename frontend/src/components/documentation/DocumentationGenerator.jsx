@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, RefreshCw, Settings, AlertCircle, CheckCircle } from 'lucide-react';
+import { FileText, RefreshCw, Settings, AlertCircle, CheckCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { documentationService } from '../../services/documentation';
 
 const DocumentationGenerator = ({ 
@@ -8,9 +8,12 @@ const DocumentationGenerator = ({
   onGenerationComplete,
   onGenerationError,
   isGenerating = false,
-  generationProgress = 0
+  generationProgress = 0,
+  hasExistingDocumentation = false,
+  lastGenerated = null
 }) => {
   const [showOptions, setShowOptions] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [options, setOptions] = useState({
     detailLevel: 'standard', // 'basic', 'standard', 'detailed'
     includeExamples: true,
@@ -21,6 +24,7 @@ const DocumentationGenerator = ({
   });
   const [error, setError] = useState(null);
   const [generationStatus, setGenerationStatus] = useState(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const handleGenerateDocumentation = async () => {
     if (!repository || !repository.id) return;
@@ -54,9 +58,22 @@ const DocumentationGenerator = ({
         }
       );
       
-      // Generation completed successfully
-      if (result.documentation && onGenerationComplete) {
-        onGenerationComplete(result.documentation);
+      // Generation completed successfully - try to get documentation
+      if (onGenerationComplete) {
+        // Try to get documentation from result or fetch it fresh
+        let documentation = result.documentation;
+        
+        if (!documentation) {
+          // If no documentation in result, fetch it from the API
+          try {
+            const freshResponse = await documentationService.getDocumentation(repository.id);
+            documentation = freshResponse.data?.documentation;
+          } catch (err) {
+            console.warn('Failed to fetch fresh documentation:', err);
+          }
+        }
+        
+        onGenerationComplete(documentation);
       }
       
     } catch (err) {
@@ -68,6 +85,38 @@ const DocumentationGenerator = ({
       }
     } finally {
       setGenerationStatus(null);
+    }
+  };
+
+  const handleRegenerateDocumentation = async () => {
+    if (!repository || !repository.id) return;
+    
+    setError(null);
+    setIsRegenerating(true);
+    setShowRegenerateConfirm(false);
+    
+    try {
+      // First delete existing documentation
+      await documentationService.deleteDocumentation(repository.id);
+      
+      // Clear the service cache to ensure fresh data
+      documentationService.clearCache(repository.id);
+      
+      // Then generate new documentation
+      await handleGenerateDocumentation();
+      
+      // Force a small delay to ensure backend has time to save
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+    } catch (err) {
+      console.error('Error regenerating documentation:', err);
+      setError(err.message || 'Failed to regenerate documentation');
+      
+      if (onGenerationError) {
+        onGenerationError(err);
+      }
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -107,13 +156,39 @@ const DocumentationGenerator = ({
     return stageMap[stage] || stage;
   };
 
+  const formatLastGenerated = (dateString) => {
+    if (!dateString) return '';
+    
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) {
+        return 'today';
+      } else if (diffDays === 1) {
+        return 'yesterday';
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        return date.toLocaleDateString();
+      }
+    } catch (e) {
+      return dateString;
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow mb-6">
       <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-gray-800">Documentation Generator</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Generate comprehensive documentation for this repository
+            {hasExistingDocumentation 
+              ? `Documentation was last generated ${formatLastGenerated(lastGenerated)}`
+              : 'Generate comprehensive documentation for this repository'
+            }
           </p>
         </div>
         <div className="flex space-x-2">
@@ -135,6 +210,37 @@ const DocumentationGenerator = ({
             <div>
               <h3 className="text-sm font-medium text-red-800">Error generating documentation</h3>
               <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regeneration Confirmation Dialog */}
+      {showRegenerateConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-orange-500 mr-3" />
+              <h3 className="text-lg font-bold text-gray-800">Regenerate Documentation?</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              This will <strong>permanently delete</strong> all existing documentation and generate new documentation from scratch. 
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowRegenerateConfirm(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRegenerateDocumentation}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Regenerate Documentation
+              </button>
             </div>
           </div>
         </div>
@@ -233,7 +339,7 @@ const DocumentationGenerator = ({
       )}
 
       {/* Generation progress */}
-      {(isGenerating || generationStatus) && (
+      {(isGenerating || generationStatus || isRegenerating) && (
         <div className="px-6 py-4">
           <div className="flex items-center mb-2">
             {generationStatus?.status === 'completed' ? (
@@ -244,7 +350,9 @@ const DocumentationGenerator = ({
             <span className="text-sm font-medium text-gray-700">
               {generationStatus?.status === 'completed' 
                 ? 'Documentation generated successfully!'
-                : formatStageName(generationStatus?.current_stage || 'Generating documentation...')
+                : isRegenerating 
+                  ? 'Regenerating documentation...'
+                  : formatStageName(generationStatus?.current_stage || 'Generating documentation...')
               }
             </span>
             <span className="ml-auto text-sm text-gray-500">
@@ -262,35 +370,63 @@ const DocumentationGenerator = ({
           <p className="text-xs text-gray-500 mt-2">
             {generationStatus?.status === 'completed'
               ? 'Documentation has been generated and is ready to view.'
-              : 'AI is analyzing your code and generating comprehensive documentation. This may take a few minutes.'
+              : isRegenerating
+                ? 'Deleting existing documentation and generating new comprehensive documentation.'
+                : 'AI is analyzing your code and generating comprehensive documentation. This may take a few minutes.'
             }
           </p>
         </div>
       )}
 
-      {/* Generation button */}
-      <div className="px-6 py-4 flex justify-end">
-        <button
-          onClick={handleGenerateDocumentation}
-          disabled={isGenerating || !repository || generationStatus?.status === 'processing'}
-          className={`flex items-center px-4 py-2 rounded-lg text-white ${
-            isGenerating || !repository || generationStatus?.status === 'processing'
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-primary-600 hover:bg-primary-700'
-          }`}
-        >
-          {isGenerating || generationStatus?.status === 'processing' ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <FileText className="w-4 h-4 mr-2" />
-              Generate Documentation
-            </>
-          )}
-        </button>
+      {/* Generation buttons */}
+      <div className="px-6 py-4 flex justify-end space-x-3">
+        {hasExistingDocumentation ? (
+          // Show only Regenerate button when documentation exists
+          <button
+            onClick={() => setShowRegenerateConfirm(true)}
+            disabled={isGenerating || isRegenerating || !repository || generationStatus?.status === 'processing'}
+            className={`flex items-center px-4 py-2 rounded-lg border ${
+              isGenerating || isRegenerating || !repository || generationStatus?.status === 'processing'
+                ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-50 hover:border-orange-400'
+            }`}
+          >
+            {isRegenerating ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Regenerate Documentation
+              </>
+            )}
+          </button>
+        ) : (
+          // Show only Generate button when no documentation exists
+          <button
+            onClick={handleGenerateDocumentation}
+            disabled={isGenerating || isRegenerating || !repository || generationStatus?.status === 'processing'}
+            className={`flex items-center px-4 py-2 rounded-lg text-white ${
+              isGenerating || isRegenerating || !repository || generationStatus?.status === 'processing'
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-primary-600 hover:bg-primary-700'
+            }`}
+          >
+            {isGenerating || generationStatus?.status === 'processing' ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <FileText className="w-4 h-4 mr-2" />
+                Generate Documentation
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

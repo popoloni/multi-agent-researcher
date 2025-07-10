@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, ExternalLink, Eye, Search, Filter, List, TreePine, ChevronDown, ChevronRight, Folder, File } from 'lucide-react';
+import { FileText, Eye, Search, List, TreePine, ChevronDown, ChevronRight, File } from 'lucide-react';
 import { repositoryService, cleanRepositoryPath } from '../../services/repositories';
 import LoadingSpinner from '../common/LoadingSpinner';
-import StatusBadge from '../common/StatusBadge';
 
 const FunctionalitiesRegistry = ({ 
   repository, 
@@ -21,7 +20,39 @@ const FunctionalitiesRegistry = ({
   const [selectedBranch, setSelectedBranch] = useState(branch || 'main');
   const [viewMode, setViewMode] = useState('hierarchical'); // 'hierarchical' or 'flat'
   const [expandedFiles, setExpandedFiles] = useState(new Set());
-  const [currentRepository, setRepository] = useState(repository);
+
+  // Helper function to clean file paths by removing local repository prefix
+  const cleanFilePath = (filePath) => {
+    if (!filePath || !repository) return filePath;
+    
+    // Remove the local repository path prefix (e.g., /tmp/kenobi_repos/astropy_popoloni_20250711_000638)
+    if (repository.local_path && filePath.startsWith(repository.local_path)) {
+      const relativePath = filePath.substring(repository.local_path.length);
+      return relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+    }
+    
+    // Fallback: try to extract relative path from common patterns
+    const pathParts = filePath.split('/');
+    const repoNamePattern = repository.name;
+    const repoIndex = pathParts.findIndex(part => part.includes(repoNamePattern.split('_')[0]));
+    
+    if (repoIndex >= 0 && repoIndex < pathParts.length - 1) {
+      return '/' + pathParts.slice(repoIndex + 1).join('/');
+    }
+    
+    return filePath;
+  };
+
+  // Helper function to get GitHub URL
+  const getGitHubUrl = () => {
+    if (!repository) return null;
+    
+    return repository.github_metadata?.html_url || 
+           repository.github_url || 
+           repository.html_url ||
+           repository.clone_url?.replace('.git', '') ||
+           (repository.name ? `https://github.com/${repository.name.split('_')[1]}/${repository.name.split('_')[0]}` : null);
+  };
 
   useEffect(() => {
     setFunctionalities(apiEndpoints);
@@ -62,16 +93,28 @@ const FunctionalitiesRegistry = ({
     }
   };
 
-  const filteredFunctionalities = functionalities.filter(func =>
-    func.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    func.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    func.file_path?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFunctionalities = functionalities.filter(func => {
+    const searchLower = searchTerm.toLowerCase();
+    const nameMatch = func.name.toLowerCase().includes(searchLower);
+    const descriptionMatch = func.description?.toLowerCase().includes(searchLower);
+    const rawPathMatch = func.file_path?.toLowerCase().includes(searchLower);
+    
+    // Also check against the cleaned file path (what users actually see)
+    const cleanedPath = cleanFilePath(func.file_path || func.file || '');
+    const cleanedPathMatch = cleanedPath.toLowerCase().includes(searchLower);
+    
+    return nameMatch || descriptionMatch || rawPathMatch || cleanedPathMatch;
+  });
 
   // Group functionalities by file path
   const groupedFunctionalities = filteredFunctionalities.reduce((acc, func) => {
     // Better handling of missing file paths
     let filePath = func.file_path || func.file || 'Unknown File';
+    
+    // Clean the file path to remove local prefix
+    if (filePath !== 'Unknown File') {
+      filePath = cleanFilePath(filePath);
+    }
     
     // If we still have "Unknown File", try to create a meaningful grouping
     if (filePath === 'Unknown File' && func.element_type) {
@@ -117,12 +160,7 @@ const FunctionalitiesRegistry = ({
       return;
     }
 
-    // Try multiple ways to get the GitHub URL
-    const githubUrl = repository.github_metadata?.html_url || 
-                     repository.github_url || 
-                     repository.html_url ||
-                     repository.clone_url?.replace('.git', '');
-
+    const githubUrl = getGitHubUrl();
     if (!githubUrl) {
       console.warn('GitHub URL not available for this repository');
       return;
@@ -136,13 +174,17 @@ const FunctionalitiesRegistry = ({
       return;
     }
 
+    // Clean the file path to remove local prefix
+    const cleanedPath = cleanFilePath(filePath);
+    const relativePath = cleanedPath.startsWith('/') ? cleanedPath.substring(1) : cleanedPath;
+
     // Create GitHub link to specific line
     if (functionality.start_line) {
-      const fullUrl = `${githubUrl}/blob/${selectedBranch}/${filePath}#L${functionality.start_line}`;
+      const fullUrl = `${githubUrl}/blob/${selectedBranch}/${relativePath}#L${functionality.start_line}`;
       window.open(fullUrl, '_blank');
     } else {
       // Fallback to file without line number
-      const fullUrl = `${githubUrl}/blob/${selectedBranch}/${filePath}`;
+      const fullUrl = `${githubUrl}/blob/${selectedBranch}/${relativePath}`;
       window.open(fullUrl, '_blank');
     }
   };
@@ -192,7 +234,7 @@ const FunctionalitiesRegistry = ({
               <div><strong>Files found:</strong> {sortedFiles.length}</div>
               <div><strong>Repository data available:</strong> {repository ? 'Yes' : 'No'}</div>
               {repository && (
-                <div><strong>GitHub URL:</strong> {repository.github_metadata?.html_url || 'Not available'}</div>
+                <div><strong>GitHub URL:</strong> {getGitHubUrl() || 'Not available'}</div>
               )}
               <div><strong>Sample functionality:</strong></div>
               <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-32">
@@ -314,12 +356,13 @@ const FunctionalitiesRegistry = ({
             onViewSource={handleViewSource}
             onViewDocumentation={handleViewDocumentation}
             searchTerm={searchTerm}
+            cleanFilePath={cleanFilePath}
           />
         ) : (
           <FlatView 
             functionalities={filteredFunctionalities.sort((a, b) => {
               // Sort by file, then by type, then by name
-              const fileCompare = (a.file_path || '').localeCompare(b.file_path || '');
+              const fileCompare = (a.file_path || a.file || '').localeCompare(b.file_path || b.file || '');
               if (fileCompare !== 0) return fileCompare;
               
               const typeOrder = { 'class': 0, 'function': 1, 'method': 2, 'variable': 3 };
@@ -334,6 +377,7 @@ const FunctionalitiesRegistry = ({
             onViewSource={handleViewSource}
             onViewDocumentation={handleViewDocumentation}
             searchTerm={searchTerm}
+            cleanFilePath={cleanFilePath}
           />
         )}
       </div>
@@ -384,7 +428,8 @@ const HierarchicalView = ({
   toggleFileExpansion,
   onViewSource,
   onViewDocumentation,
-  searchTerm 
+  searchTerm,
+  cleanFilePath
 }) => {
   if (sortedFiles.length === 0) {
     return (
@@ -427,6 +472,7 @@ const HierarchicalView = ({
                   onViewSource={onViewSource}
                   onViewDocumentation={onViewDocumentation}
                   showFile={false}
+                  cleanFilePath={cleanFilePath}
                 />
               ))}
             </div>
@@ -441,7 +487,8 @@ const FlatView = ({
   functionalities, 
   onViewSource, 
   onViewDocumentation,
-  searchTerm 
+  searchTerm,
+  cleanFilePath
 }) => {
   if (functionalities.length === 0) {
     return (
@@ -473,6 +520,7 @@ const FlatView = ({
             onViewSource={onViewSource}
             onViewDocumentation={onViewDocumentation}
             showFile={true}
+            cleanFilePath={cleanFilePath}
           />
         ))}
       </div>
@@ -484,7 +532,8 @@ const FunctionalityRow = ({
   functionality, 
   onViewSource, 
   onViewDocumentation, 
-  showFile = true 
+  showFile = true,
+  cleanFilePath
 }) => {
   const getTypeColor = (type) => {
     const colors = {
@@ -513,8 +562,8 @@ const FunctionalityRow = ({
           </span>
         </div>
         <div className="col-span-4 text-gray-600 text-sm">
-          <div className="truncate" title={functionality.file_path}>
-            {functionality.file_path}
+          <div className="truncate" title={functionality.file_path || functionality.file}>
+            {cleanFilePath(functionality.file_path || functionality.file)}
           </div>
         </div>
         <div className="col-span-1 text-gray-500 text-sm">

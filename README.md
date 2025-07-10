@@ -7,6 +7,24 @@ An advanced AI-powered code analysis and repository management platform with 90+
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Production Ready](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](https://github.com/popoloni/multi-agent-researcher)
 
+## 📸 Application Screenshots
+
+### Dashboard Overview
+![Dashboard](imgs/Screenshot%202025-07-11%20alle%2001.07.57.png)
+*Main dashboard showing system status, repository metrics, and quick actions*
+
+### Repository Documentation
+![Documentation](imgs/Screenshot%202025-07-11%20alle%2001.08.55.png)
+*AI-generated documentation with comprehensive overviews, architecture analysis, and user guides*
+
+### Obione Chat Interface
+![Chat Interface](imgs/Screenshot%202025-07-11%20alle%2001.09.09.png)
+*Interactive AI chat interface with repository context awareness and modern UI*
+
+### Web Research System
+![Research Interface](imgs/Screenshot%202025-07-11%20alle%2001.09.55.png)
+*Multi-agent research system with real-time progress tracking and comprehensive results*
+
 ## 🚀 Quick Start
 
 ```bash
@@ -25,7 +43,7 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 # ./start_ui.sh     # Start frontend
 ```
 
-**📖 For detailed setup instructions, see [SETUP_AND_DEPLOYMENT.md](SETUP_AND_DEPLOYMENT.md)**
+**📖 For detailed setup instructions, see [docs/setup/SETUP_AND_DEPLOYMENT.md](docs/setup/SETUP_AND_DEPLOYMENT.md)**
 
 ### Access the Application
 - **Frontend UI**: http://localhost:12001
@@ -60,9 +78,9 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 - **🏗️ Multi-Agent Architecture** - Specialized agents for orchestration, analysis, and dependencies
 - **🎯 Complete Workflow** - GitHub search → clone → index → AI documentation → documentation-aware chat
 
-## 🎉 Latest Improvements (v1.3.0)
+## 🎉 Latest Improvements (v1.4.0)
 
-### 💬 Fully Functional Chat System
+### 💬 Fully Functional Obione Chat System
 - **AI-Powered Conversations**: Working chat interface with Ollama llama3.2:1b integration
 - **Repository Context Awareness**: Chat understands repository structure and answers code-specific questions
 - **Session Management**: Create and manage chat sessions with unique session IDs
@@ -143,8 +161,8 @@ LEAD_AGENT_MODEL=claude-4-sonnet-20241120          # Lead research planning
 SUBAGENT_MODEL=claude-4-sonnet-20241120            # Sub-research execution
 CITATION_MODEL=claude-3-5-haiku-20241022           # Citation generation
 
-# === KENOBI CHAT & CODE ANALYSIS ===
-KENOBI_MODEL=claude-4-sonnet-20241120              # Code analysis & chat
+# === OBIONE CHAT & CODE ANALYSIS ===
+OBIONE_MODEL=claude-4-sonnet-20241120              # Code analysis & chat
 
 # === DOCUMENTATION GENERATION ===
 DOCUMENTATION_MODEL=claude-4-sonnet-20241120       # Documentation generation
@@ -176,7 +194,7 @@ GOOGLE_CSE_ID=your_cse_id_here
 LEAD_AGENT_MODEL=claude-4-opus-20241120
 SUBAGENT_MODEL=claude-4-sonnet-20241120
 CITATION_MODEL=claude-3-5-haiku-20241022
-KENOBI_MODEL=claude-4-sonnet-20241120
+OBIONE_MODEL=claude-4-sonnet-20241120
 DOCUMENTATION_MODEL=claude-4-sonnet-20241120
 ```
 
@@ -185,7 +203,7 @@ DOCUMENTATION_MODEL=claude-4-sonnet-20241120
 LEAD_AGENT_MODEL=claude-4-sonnet-20241120
 SUBAGENT_MODEL=claude-4-sonnet-20241120
 CITATION_MODEL=claude-3-5-haiku-20241022
-KENOBI_MODEL=claude-3-5-sonnet-20241022
+OBIONE_MODEL=claude-3-5-sonnet-20241022
 DOCUMENTATION_MODEL=claude-3-5-sonnet-20241022
 ```
 
@@ -194,7 +212,7 @@ DOCUMENTATION_MODEL=claude-3-5-sonnet-20241022
 LEAD_AGENT_MODEL=llama3.1:8b
 SUBAGENT_MODEL=mistral:7b
 CITATION_MODEL=llama3.2:3b
-KENOBI_MODEL=llama3.1:8b
+OBIONE_MODEL=llama3.1:8b
 DOCUMENTATION_MODEL=llama3.1:8b
 ```
 
@@ -203,7 +221,7 @@ DOCUMENTATION_MODEL=llama3.1:8b
 LEAD_AGENT_MODEL=claude-4-sonnet-20241120
 SUBAGENT_MODEL=llama3.1:8b
 CITATION_MODEL=llama3.2:3b
-KENOBI_MODEL=claude-4-sonnet-20241120
+OBIONE_MODEL=claude-4-sonnet-20241120
 DOCUMENTATION_MODEL=claude-3-5-sonnet-20241022
 ```
 
@@ -242,7 +260,7 @@ services:
 - **[Interactive API Docs](http://localhost:12000/docs)** - Swagger UI with all 90+ endpoints
 - **[Frontend Dashboard](http://localhost:12001)** - Complete UI with AI documentation generation
 - **[Repository Management](http://localhost:12001/repositories)** - Clone, analyze, and manage repositories
-- **[Kenobi Chat](http://localhost:12001/chat)** - AI-powered chat about your codebase
+- **[Obione Chat](http://localhost:12001/chat)** - AI-powered chat about your codebase
 - **[Functionalities Registry](http://localhost:12001/repositories/{id}/functionalities)** - Hierarchical code exploration
 - **[Documentation Viewer](http://localhost:12001/repositories/{id}/documentation)** - AI-generated documentation
 
@@ -263,12 +281,16 @@ multi-agent-researcher/
 │   ├── api/                      # API documentation and examples
 │   ├── guides/                   # User guides and tutorials
 │   ├── architecture/             # System architecture documentation
-│   └── reports/                  # Implementation reports and metrics
+│   ├── setup/                    # Setup and deployment guides
+│   ├── troubleshooting/          # Troubleshooting guides
+│   ├── implementation/           # Implementation reports and fixes
+│   └── reports/                  # Development reports and metrics
 ├── migration_scripts/            # Database migration and data scripts
 │   ├── database/                 # Database schema migrations
 │   ├── data/                     # Data import/export scripts
 │   └── legacy/                   # Legacy system migration tools
 ├── demo/                         # Demo scripts and examples
+├── imgs/                         # Application screenshots
 ├── scripts/                      # Utility and automation scripts
 ├── *.sh                         # Startup and management scripts
 ├── cleanup.sh                   # Repository cleanup script
@@ -286,7 +308,8 @@ Comprehensive documentation including:
 - **[API Reference](docs/api/README.md)** - All 90+ endpoints with examples
 - **[User Guides](docs/guides/README.md)** - Feature guides and tutorials  
 - **[Architecture](docs/architecture/README.md)** - System design and components
-- **[Deployment Guide](docs/guides/deployment.md)** - Production deployment
+- **[Setup & Deployment](docs/setup/SETUP_AND_DEPLOYMENT.md)** - Complete setup guide
+- **[Troubleshooting](docs/troubleshooting/TROUBLESHOOTING_PLAN.md)** - Common issues and solutions
 - **[Implementation Reports](docs/reports/README.md)** - Development phases and metrics
 - **[Migration Scripts](migration_scripts/README.md)** - Database and data migration tools
 
@@ -304,7 +327,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed information about recent improveme
 ## 🧪 Testing
 
 ### Verified Working Features
-- ✅ **Chat System**: AI-powered conversations with repository context awareness
+- ✅ **Obione Chat System**: AI-powered conversations with repository context awareness
 - ✅ **GitHub Integration**: Complete API with search, cloning, repository info
 - ✅ **AI Documentation**: Professional content generation with Ollama integration
 - ✅ **Repository Processing**: 5-minute timeout handling for complex repositories

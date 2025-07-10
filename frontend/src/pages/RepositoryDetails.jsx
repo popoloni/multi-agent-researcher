@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FileText, GitBranch, Calendar, Code, Hash, ExternalLink } from 'lucide-react';
+import { FileText, Calendar, Code, Hash, Eye } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { repositoryService, cleanRepositoryPath } from '../services/repositories';
 
@@ -109,7 +109,7 @@ const RepositoryDetails = () => {
                 to={`/repositories/${repository.id}/functionalities`}
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center space-x-2"
               >
-                <FileText className="w-4 h-4" />
+                <Eye className="w-4 h-4" />
                 <span>View Functionalities</span>
               </Link>
               <Link
@@ -117,7 +117,7 @@ const RepositoryDetails = () => {
                 className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
               >
                 <FileText className="w-4 h-4" />
-                <span>View Documentation</span>
+                <span>Go to Documentation</span>
               </Link>
             </div>
           </div>
@@ -208,7 +208,7 @@ const RepositoryDetails = () => {
                 to={`/repositories/${repository.id}/functionalities`}
                 className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <FileText className="w-8 h-8 text-primary-600 mr-4" />
+                <Eye className="w-8 h-8 text-primary-600 mr-4" />
                 <div>
                   <h3 className="font-medium text-gray-900">View Functionalities</h3>
                   <p className="text-sm text-gray-600">Browse extracted functions, classes, and methods</p>
@@ -221,7 +221,7 @@ const RepositoryDetails = () => {
               >
                 <FileText className="w-8 h-8 text-green-600 mr-4" />
                 <div>
-                  <h3 className="font-medium text-gray-900">View Documentation</h3>
+                  <h3 className="font-medium text-gray-900">Go to Documentation</h3>
                   <p className="text-sm text-gray-600">Read generated technical documentation</p>
                 </div>
               </Link>

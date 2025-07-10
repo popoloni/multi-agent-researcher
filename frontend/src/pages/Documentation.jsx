@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { Eye } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import FunctionalitiesRegistry from '../components/documentation/FunctionalitiesRegistry';
+
 import DocumentationViewer from '../components/documentation/DocumentationViewer';
 import DocumentationNavigation from '../components/documentation/DocumentationNavigation';
 import DocumentationGenerator from '../components/documentation/DocumentationGenerator';
-import DocumentationSearch from '../components/documentation/DocumentationSearch';
+
 import DocumentationStatus from '../components/common/DocumentationStatus';
 import { repositoryService } from '../services/repositories';
 import { documentationService } from '../services/documentation';
@@ -30,12 +31,12 @@ const Documentation = () => {
   const docTypeParam = queryParams.get('type');
   
   const [repository, setRepository] = useState(null);
-  const [selectedBranch, setSelectedBranch] = useState('main');
+  const [selectedBranch] = useState('main');
   const [selectedDocType, setSelectedDocType] = useState(docTypeParam || 'overview');
   const [apiEndpoints, setApiEndpoints] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('view'); // 'view', 'search', 'functionalities'
+  const [activeTab, setActiveTab] = useState('view'); // 'view', 'generate'
   
   // Documentation state - now managed by context
   const [documentation, setDocumentation] = useState({});
@@ -44,8 +45,6 @@ const Documentation = () => {
   const [generationStage, setGenerationStage] = useState('');
   const [docStatus, setDocStatus] = useState('not_generated');
   const [lastGenerated, setLastGenerated] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
 
   // Load repository and documentation on mount and when branch changes
   useEffect(() => {
@@ -371,34 +370,7 @@ const Documentation = () => {
     setSelectedDocType(docType);
   };
 
-  // Handle search
-  const handleSearch = async (query) => {
-    if (!query || !repository) return;
-    
-    setSearchQuery(query);
-    setActiveTab('search');
-    
-    try {
-      const response = await documentationService.searchDocumentation(
-        repository.id, 
-        query,
-        selectedBranch
-      );
-      
-      setSearchResults(response.data.results || []);
-    } catch (err) {
-      console.error('Error searching documentation:', err);
-      setSearchResults([]);
-    }
-  };
 
-  // Handle search result click
-  const handleSearchResultClick = (result) => {
-    if (result.doc_type) {
-      setSelectedDocType(result.doc_type);
-      setActiveTab('view');
-    }
-  };
 
   if (isLoading) {
     return (
@@ -437,35 +409,34 @@ const Documentation = () => {
         {/* Documentation Navigation */}
         <div className="flex justify-between items-start">
           <h1 className="text-2xl font-bold">Repository Documentation</h1>
-          <DocumentationStatus 
-            status={docStatus}
-            lastGenerated={lastGenerated}
-            qualityScore={documentation.quality_score}
-            missingTypes={documentation.missing_types}
-            onRefresh={() => handleGenerateDocumentation({})}
-          />
+          <div className="flex items-center space-x-3">
+            <Link
+              to={`/repositories/${repository.id}/functionalities`}
+              className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center space-x-2"
+            >
+              <Eye className="w-4 h-4" />
+              <span>View Functionalities</span>
+            </Link>
+            <DocumentationStatus 
+              status={docStatus}
+              lastGenerated={lastGenerated}
+              qualityScore={documentation.quality_score}
+              missingTypes={documentation.missing_types}
+              onRefresh={() => handleGenerateDocumentation({})}
+            />
+          </div>
         </div>
         
         <DocumentationNavigation 
           repository={repository}
           selectedDocType={selectedDocType}
           onSelectDocType={handleDocTypeSelect}
-          onSearch={handleSearch}
         />
         
         {/* Documentation Tabs */}
-        <Tabs value={activeTab} onValueChange={(value) => {
-          if (value === 'functionalities') {
-            // Navigate to the original functionalities page instead of using embedded tab
-            navigate(`/repositories/${repository.id}/functionalities`);
-          } else {
-            setActiveTab(value);
-          }
-        }}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="view">View Documentation</TabsTrigger>
-            <TabsTrigger value="search">Search</TabsTrigger>
-            <TabsTrigger value="functionalities">Functionalities</TabsTrigger>
             <TabsTrigger value="generate">Generate</TabsTrigger>
           </TabsList>
           
@@ -481,15 +452,6 @@ const Documentation = () => {
               }
               docType={selectedDocType}
               isLoading={isGenerating}
-              onSearch={handleSearch}
-            />
-          </TabsContent>
-          
-          <TabsContent value="search">
-            <DocumentationSearch 
-              repository={repository}
-              onResultClick={handleSearchResultClick}
-              initialQuery={searchQuery}
             />
           </TabsContent>
           
@@ -512,8 +474,16 @@ const Documentation = () => {
                 setGenerationProgress(0);
                 setGenerationStage('');
                 
-                // Reload functionalities
+                // Reload functionalities and refresh documentation view
                 loadFunctionalities();
+                
+                // Switch to view tab to show the results
+                setActiveTab('view');
+                
+                // Force refresh of documentation from API to ensure latest version is shown
+                setTimeout(() => {
+                  loadDocumentationFromContext();
+                }, 1000);
               }}
               onGenerationError={(error) => {
                 setDocStatus('failed');
@@ -524,6 +494,8 @@ const Documentation = () => {
               }}
               isGenerating={isGenerating}
               generationProgress={generationProgress}
+              hasExistingDocumentation={docStatus === 'generated'}
+              lastGenerated={lastGenerated}
             />
           </TabsContent>
         </Tabs>

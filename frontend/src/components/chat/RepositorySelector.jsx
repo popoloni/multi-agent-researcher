@@ -25,7 +25,7 @@ const RepositorySelector = ({
   const loadBranches = async (repositoryId) => {
     setLoadingBranches(true);
     try {
-      const response = await fetch(`/kenobi/repositories/${repositoryId}/branches`);
+      const response = await fetch(`/api/repositories/${repositoryId}/branches`);
       if (response.ok) {
         const data = await response.json();
         setBranches(data.branches || ['main', 'master', 'develop']);
@@ -104,40 +104,27 @@ const RepositorySelector = ({
         </div>
       </div>
 
-      {/* Repository Info */}
+      {/* Repository Info - Compact */}
       {selectedRepo && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Folder className="w-4 h-4 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="font-medium text-blue-900">{selectedRepo.name}</h3>
-                <div className="flex items-center space-x-4 text-sm text-blue-700">
-                  <span>{selectedRepo.language || 'Unknown language'}</span>
-                  <span>•</span>
-                  <span>{selectedRepo.file_count} files</span>
-                  <span>•</span>
-                  <span>{selectedRepo.line_count?.toLocaleString()} lines</span>
-                </div>
-              </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Folder className="w-4 h-4 text-blue-600" />
             </div>
-            {selectedRepo.indexed_at && (
-              <div className="text-xs text-blue-600">
-                Indexed: {new Date(selectedRepo.indexed_at).toLocaleDateString()}
-              </div>
-            )}
-          </div>
-          
-          {selectedBranch && (
-            <div className="mt-2 pt-2 border-t border-blue-200">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-blue-900 truncate">{selectedRepo.name}</h3>
               <div className="flex items-center space-x-2 text-sm text-blue-700">
-                <GitBranch className="w-4 h-4" />
-                <span>Working on branch: <strong>{selectedBranch}</strong></span>
+                <span>{selectedRepo.language || 'Unknown'}</span>
+                {selectedBranch && (
+                  <>
+                    <span>•</span>
+                    <GitBranch className="w-3 h-3" />
+                    <span>{selectedBranch}</span>
+                  </>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -145,8 +132,8 @@ const RepositorySelector = ({
       {!selectedRepository && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
           <p className="text-sm text-gray-600">
-            💡 Select a repository to start chatting with Kenobi about your code. 
-            Kenobi can help you understand functions, explain code patterns, and answer questions about your codebase.
+            💡 Select a repository to start chatting with Obione about your code. 
+            Obione can help you understand functions, explain code patterns, and answer questions about your codebase.
           </p>
         </div>
       )}

@@ -1,12 +1,12 @@
 import React from 'react';
 import Layout from '../components/layout/Layout';
-import KenobiChat from '../components/chat/KenobiChat';
+import ObioneChat from '../components/chat/ObioneChat';
 
 const Chat = () => {
   return (
     <Layout>
       <div className="h-full">
-        <KenobiChat />
+        <ObioneChat />
       </div>
     </Layout>
   );

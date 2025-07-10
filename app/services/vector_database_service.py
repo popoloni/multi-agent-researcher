@@ -16,7 +16,7 @@ from enum import Enum
 import uuid
 
 from app.services.database_service import database_service
-from app.engines.vector_service import VectorService, VectorDocument, SimilarityResult, EmbeddingModel
+from app.engines.vector_service import VectorDocument, SimilarityResult, EmbeddingModel
 from app.services.cache_service import cache_service
 from app.database.models import VectorIndex, VectorDocument as VectorDocumentModel
 
@@ -71,7 +71,9 @@ class VectorDatabaseService:
     
     def __init__(self):
         self.db_service = database_service
-        self.vector_service = VectorService()
+        # Use the global vector service instance to ensure shared memory store
+        from app.engines.vector_service import vector_service
+        self.vector_service = vector_service
         self.cache_service = cache_service
         
         # Performance tracking
@@ -168,7 +170,7 @@ class VectorDatabaseService:
         repository_id: Optional[str] = None,
         document_types: Optional[List[DocumentType]] = None,
         limit: int = 10,
-        similarity_threshold: float = 0.7,
+        similarity_threshold: float = 0.3,
         use_hybrid_search: bool = True
     ) -> List[SearchResult]:
         """
@@ -202,8 +204,10 @@ class VectorDatabaseService:
                 query, repository_id, document_types, limit, similarity_threshold
             )
             
-            # Enhance with hybrid search if enabled
-            if use_hybrid_search:
+            logger.info(f"Semantic search for '{query}' found {len(semantic_results)} results")
+            
+            # Enhance with hybrid search if enabled (only when using persistent storage)
+            if use_hybrid_search and self.vector_service.collection:
                 keyword_results = await self._keyword_search(
                     query, repository_id, document_types, limit
                 )

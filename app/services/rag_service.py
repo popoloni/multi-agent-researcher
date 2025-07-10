@@ -56,6 +56,9 @@ class RAGService:
     """
     
     def __init__(self):
+        # Use the shared vector service instance directly (same as KenobiAgent)
+        from app.engines.vector_service import vector_service
+        self.vector_service = vector_service
         self.vector_db_service = VectorDatabaseService()
         self.documentation_service = DocumentationService()
         self.analysis_service = AnalysisService()
@@ -70,7 +73,7 @@ class RAGService:
         # Context configuration
         self.max_context_documents = 10
         self.max_context_length = 6000  # Maximum context length in characters
-        self.relevance_threshold = 0.6  # Minimum relevance score for context inclusion
+        self.relevance_threshold = 0.05  # Minimum relevance score for context inclusion (lowered for hash-based embeddings)
         
         # Performance tracking
         self.performance_stats = {
@@ -208,26 +211,35 @@ class RAGService:
     async def _retrieve_relevant_documents(self, query: str, repo_id: str) -> List[ContextDocument]:
         """Retrieve relevant documents for context building"""
         try:
-            # Search for code and documentation using vector search
-            search_results = await self.vector_db_service.search_documents(
+            # Search for code and documentation using the shared vector service directly (same as KenobiAgent)
+            # Note: Removing repository filter for now since we only have one repository and filters seem to cause issues
+            vector_results = await self.vector_service.similarity_search(
                 query=query,
-                repository_id=repo_id,
                 limit=self.max_context_documents,
-                similarity_threshold=self.relevance_threshold
+                filters=None
             )
             
-            # Convert search results to context documents
+            logger.info(f"Vector search for query '{query}' returned {len(vector_results)} results")
+            
+            # Convert vector results to context documents  
             context_documents = []
-            for result in search_results:
-                doc_type = result.document_type.value if hasattr(result, 'document_type') else "unknown"
+            for result in vector_results:
+                # Apply similarity threshold filter
+                if result.similarity_score < self.relevance_threshold:
+                    continue
+                
+                # Extract metadata
+                metadata = result.document.metadata if hasattr(result.document, 'metadata') else {}
+                doc_type = metadata.get('element_type', 'unknown')
+                file_path = metadata.get('file_path')
                 
                 context_doc = ContextDocument(
                     content=result.document.content,
                     source_type=doc_type,
-                    file_path=result.file_path,
-                    line_numbers=result.line_numbers,
+                    file_path=file_path,
+                    line_numbers=None,  # Vector service doesn't store line numbers directly
                     relevance_score=result.similarity_score,
-                    metadata=result.document.metadata
+                    metadata=metadata
                 )
                 context_documents.append(context_doc)
             

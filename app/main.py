@@ -3672,3 +3672,58 @@ async def serve_spa(path: str):
     else:
         raise HTTPException(status_code=404, detail="Frontend not built")
 
+# Debug endpoint for RAG service
+@app.get("/api/debug/rag/{repo_id}")
+async def debug_rag_service(repo_id: str, query: str = "filtering"):
+    """Debug RAG service integration"""
+    try:
+        from app.services.rag_service import RAGService
+        from app.services.vector_database_service import VectorDatabaseService
+        
+        # Test vector database service directly
+        vector_db = VectorDatabaseService()
+        vector_results = await vector_db.search_documents(
+            query=query,
+            repository_id=repo_id,
+            limit=5,
+            similarity_threshold=0.2
+        )
+        
+        # Test RAG service
+        rag_service = RAGService()
+        rag_context = await rag_service._retrieve_relevant_documents(query, repo_id)
+        
+        # Check vector database stats from both services
+        vector_db_stats = await vector_db.get_health_status()
+        rag_vector_db_stats = await rag_service.vector_db_service.get_health_status()
+        
+        return {
+            "query": query,
+            "repository_id": repo_id,
+            "vector_db_results": len(vector_results),
+            "vector_db_samples": [
+                {
+                    "id": result.document.id,
+                    "similarity": result.similarity_score,
+                    "file_path": result.file_path,
+                    "content_preview": result.document.content[:100] + "..." if len(result.document.content) > 100 else result.document.content
+                }
+                for result in vector_results[:2]
+            ],
+            "rag_context_results": len(rag_context),
+            "rag_context_samples": [
+                {
+                    "source_type": doc.source_type,
+                    "file_path": doc.file_path,
+                    "relevance_score": doc.relevance_score,
+                    "content_preview": doc.content[:100] + "..." if len(doc.content) > 100 else doc.content
+                }
+                for doc in rag_context[:2]
+            ],
+            "vector_db_stats": vector_db_stats["vector_database"]["document_count"],
+            "rag_vector_db_stats": rag_vector_db_stats["vector_database"]["document_count"]
+        }
+        
+    except Exception as e:
+        return {"error": str(e)}
+

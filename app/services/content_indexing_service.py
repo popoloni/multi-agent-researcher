@@ -332,7 +332,8 @@ class ContentIndexingService:
                 query=query,
                 repository_id=repository_id,
                 document_types=document_types if document_types else None,
-                limit=limit
+                limit=limit,
+                similarity_threshold=0.2  # Lower threshold for better recall
             )
             
             # Format results for content indexing context

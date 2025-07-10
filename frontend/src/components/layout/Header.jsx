@@ -53,7 +53,7 @@ const Header = () => {
               }`}
             >
               <MessageSquare className="w-4 h-4" />
-              <span>Kenobi Chat</span>
+                                <span>Obione Chat</span>
             </Link>
             <Link 
               to="/research" 

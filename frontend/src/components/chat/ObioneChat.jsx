@@ -8,7 +8,7 @@ import MessageContent from './MessageContent';
 import { chatService } from '../../services/chat';
 import { repositoryService } from '../../services/repositories';
 
-const KenobiChat = () => {
+const ObioneChat = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [selectedRepository, setSelectedRepository] = useState('');
@@ -169,7 +169,7 @@ const KenobiChat = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <Bot className="w-6 h-6 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">Kenobi Chat</h1>
+              <h1 className="text-xl font-bold text-gray-900">Obione Chat</h1>
             </div>
             <button
               onClick={() => setShowSettings(!showSettings)}
@@ -296,7 +296,7 @@ const KenobiChat = () => {
             <div className="text-center py-12">
               <Bot className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Welcome to Kenobi Chat
+                Welcome to Obione Chat
               </h3>
               <p className="text-gray-600 max-w-md mx-auto">
                 Ask questions about your repository code, get explanations, and explore your codebase with AI assistance.
@@ -392,7 +392,7 @@ const KenobiChat = () => {
                       <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
                       <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                     </div>
-                    <span className="text-sm text-gray-500 ml-2">Kenobi is thinking...</span>
+                    <span className="text-sm text-gray-500 ml-2">Obione is thinking...</span>
                   </div>
                 </div>
               </div>
@@ -410,7 +410,7 @@ const KenobiChat = () => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={selectedRepository ? "Ask Kenobi about your code..." : "Select a repository first..."}
+                placeholder={selectedRepository ? "Ask Obione about your code..." : "Select a repository first..."}
                 disabled={!selectedRepository || isLoading}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none shadow-sm transition-all"
                 rows="2"
@@ -465,4 +465,4 @@ const KenobiChat = () => {
   );
 };
 
-export default KenobiChat;
+export default ObioneChat;

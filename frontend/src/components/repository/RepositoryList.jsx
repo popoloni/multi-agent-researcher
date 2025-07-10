@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Search, Trash2, Eye, FileText, ExternalLink, GitBranch } from 'lucide-react';
+import { Plus, Trash2, Eye, FileText, ExternalLink, GitBranch } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import RepositoryForm from './RepositoryForm';
 import StatusBadge from '../common/StatusBadge';
-import { repositoryService, cleanRepositoryPath, getDebugPath } from '../../services/repositories';
+import { cleanRepositoryPath } from '../../services/repositories';
 
 const RepositoryList = ({ repositories, onAddRepository, onDeleteRepository, isLoading }) => {
   const [showAddForm, setShowAddForm] = useState(false);
@@ -127,14 +127,38 @@ const RepositoryList = ({ repositories, onAddRepository, onDeleteRepository, isL
 };
 
 const RepositoryRow = ({ repository, onDelete }) => {
-  const [isSelected, setIsSelected] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  
+  // Extract GitHub URL from repository name
+  const getGitHubUrl = (repo) => {
+    if (repo.url && repo.url.startsWith('http')) {
+      return repo.url;
+    }
+    
+    // Try to extract GitHub URL from repository name
+    // Expected format: reponame_username_timestamp or similar
+    const name = repo.name || '';
+    if (name.includes('_')) {
+      const parts = name.split('_');
+      if (parts.length >= 2) {
+        const repoName = parts[0];
+        const username = parts[1];
+        return `https://github.com/${username}/${repoName}`;
+      }
+    }
+    
+    // Fallback: show the repository name as a display value
+    return `Repository: ${cleanRepositoryPath(name)}`;
+  };
+
+  // Get display URL
+  const displayUrl = getGitHubUrl(repository);
+  const isExternalUrl = displayUrl.startsWith('http');
+  const isInferredGitHub = isExternalUrl && !repository.url;
   
   return (
     <div 
-      className={`px-6 py-4 grid grid-cols-12 gap-4 items-center ${
-        isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'
-      }`}
+      className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50"
     >
       <div className="col-span-3">
         <div className="font-medium">{cleanRepositoryPath(repository.name)}</div>
@@ -146,16 +170,35 @@ const RepositoryRow = ({ repository, onDelete }) => {
         )}
       </div>
       <div className="col-span-4 text-gray-600">
-        {cleanRepositoryPath(repository.path || repository.url)}
+        <div className="flex items-center space-x-2">
+          <span className="truncate">{displayUrl}</span>
+          {isInferredGitHub && (
+            <span className="text-xs text-gray-400 flex-shrink-0">(inferred)</span>
+          )}
+          {isExternalUrl && (
+            <a
+              href={displayUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-700 flex-shrink-0"
+              title={isInferredGitHub ? "Open inferred GitHub URL (may not be accurate)" : "Open in new tab"}
+            >
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
+        </div>
         <button 
           onClick={() => setShowDebug(!showDebug)}
-          className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+          className="text-xs text-gray-500 hover:text-gray-700 mt-1"
         >
           {showDebug ? 'Hide Debug' : 'Show Debug'}
         </button>
         {showDebug && (
-          <div className="mt-1 text-xs text-gray-500 break-all">
-            Full path: {getDebugPath(repository.path)}
+          <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+            <div><strong>Local Path:</strong></div>
+            <div className="break-all font-mono">{repository.local_path || repository.path}</div>
+            <div className="mt-1"><strong>Repository ID:</strong></div>
+            <div className="font-mono">{repository.id}</div>
           </div>
         )}
       </div>
@@ -165,36 +208,25 @@ const RepositoryRow = ({ repository, onDelete }) => {
       <div className="col-span-3 flex items-center space-x-2">
         <Link
           to={`/repositories/${repository.id}/functionalities`}
-          className="text-primary-600 hover:text-primary-700 flex items-center space-x-1 text-sm"
+          className="text-gray-600 hover:text-gray-700 p-1"
+          title="View functionalities"
+        >
+          <Eye className="w-4 h-4" />
+        </Link>
+        <Link
+          to={`/repositories/${repository.id}/documentation`}
+          className="text-gray-600 hover:text-gray-700 p-1"
+          title="View documentation"
         >
           <FileText className="w-4 h-4" />
-          <span>Functionalities</span>
         </Link>
         <button
           onClick={() => onDelete(repository.id)}
           className="text-red-600 hover:text-red-700 p-1"
-          title="Delete repository"
+          title="Delete repository (removes local files and database records)"
         >
           <Trash2 className="w-4 h-4" />
         </button>
-        <Link
-          to={`/repositories/${repository.id}`}
-          className="text-gray-600 hover:text-gray-700 p-1"
-          title="View details"
-        >
-          <Eye className="w-4 h-4" />
-        </Link>
-        {repository.path && repository.path.startsWith('http') && (
-          <a
-            href={repository.path}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-gray-600 hover:text-gray-700 p-1"
-            title="Open in new tab"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
-        )}
       </div>
     </div>
   );

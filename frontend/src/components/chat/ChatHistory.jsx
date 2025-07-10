@@ -274,7 +274,7 @@ const ChatHistory = ({
                 <div className="text-sm text-gray-600 truncate">
                   {(session.lastMessage.role === 'user' || session.lastMessage.type === 'user') 
                     ? 'You: ' 
-                    : 'Kenobi: '
+                    : 'Obione: '
                   }
                   {session.lastMessage.content}
                 </div>
@@ -303,7 +303,7 @@ const ChatHistory = ({
                       >
                         <div className="font-medium mb-1 flex items-center justify-between">
                           <div>
-                            {(message.role === 'user' || message.type === 'user') ? 'You' : 'Kenobi'} - {formatTime(message.timestamp)}
+                            {(message.role === 'user' || message.type === 'user') ? 'You' : 'Obione'} - {formatTime(message.timestamp)}
                           </div>
                           {messageContainsCode(message.content) && (
                             <Code className="w-3 h-3 text-blue-600" title="Contains code" />
