@@ -89,7 +89,7 @@ ollama_response = await client.post(
 
 ```bash
 # 1. Stop all services
-./stop_all.sh
+./start_all.sh stop
 
 # 2. Clear Python cache
 find . -type d -name "__pycache__" -exec rm -rf {} +

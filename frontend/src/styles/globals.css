@@ -17,6 +17,34 @@ code {
     monospace;
 }
 
+/* Search highlighting styles */
+mark {
+  background-color: #fef3c7 !important; /* bg-yellow-200 */
+  padding: 0.125rem 0.25rem !important; /* px-1 py-0.5 */
+  border-radius: 0.25rem !important; /* rounded */
+  color: #1f2937 !important; /* text-gray-800 */
+  font-weight: 500 !important;
+}
+
+mark.bg-yellow-200 {
+  background-color: #fef3c7 !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+  color: #1f2937 !important;
+  font-weight: 500 !important;
+}
+
+/* Ensure search highlights are visible in all contexts */
+.prose mark,
+.message-content mark,
+.documentation-content mark {
+  background-color: #fef3c7 !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+  color: #1f2937 !important;
+  font-weight: 500 !important;
+}
+
 /* Custom component styles */
 .btn-primary {
   @apply bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors;

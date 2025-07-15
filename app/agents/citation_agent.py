@@ -1,12 +1,15 @@
 from typing import List, Dict, Any, Tuple, Optional
 import re
 import json
+import logging
 from dataclasses import dataclass
 
 from app.agents.base_agent import BaseAgent
 from app.models.schemas import SearchResult
 from app.core.prompts import CITATION_AGENT_PROMPT
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -121,29 +124,98 @@ class CitationAgent(BaseAgent):
             }}
             """
             
-            response = await self._call_llm(prompt, max_tokens=2000)
-            
             try:
-                # Extract JSON from response
-                start_idx = response.find('{')
-                end_idx = response.rfind('}') + 1
-                if start_idx != -1 and end_idx != 0:
-                    json_str = response[start_idx:end_idx]
-                    data = json.loads(json_str)
-                    
+                response = await self._call_llm(prompt, max_tokens=2000)
+                
+                # Extract JSON from response with better error handling
+                json_data = self._extract_json_from_response(response)
+                
+                if json_data and "claims" in json_data:
                     # Adjust sentence numbers to global position
-                    for claim in data.get("claims", []):
-                        claim["sentence_num"] = i + claim["sentence_num"] - 1
-                        if claim["sentence_num"] < len(sentences):
-                            claim["text"] = sentences[claim["sentence_num"]]
+                    for claim in json_data["claims"]:
+                        if "sentence_num" in claim:
+                            claim["sentence_num"] = i + claim["sentence_num"] - 1
+                            if claim["sentence_num"] < len(sentences):
+                                claim["text"] = sentences[claim["sentence_num"]]
                         
-                    all_claims.extend(data.get("claims", []))
+                    all_claims.extend(json_data["claims"])
+                else:
+                    logger.warning(f"No valid claims extracted from batch starting at sentence {i}")
                 
             except Exception as e:
-                print(f"Error parsing claims: {e}")
+                logger.error(f"Error parsing claims in batch {i}: {e}")
+                # Continue with next batch instead of breaking
                 continue
                 
         return all_claims
+        
+    def _extract_json_from_response(self, response: str) -> Optional[Dict[str, Any]]:
+        """Extract JSON from LLM response with robust error handling"""
+        try:
+            # First try to find JSON within curly braces
+            start_idx = response.find('{')
+            if start_idx == -1:
+                return None
+                
+            # Find the matching closing brace
+            brace_count = 0
+            end_idx = start_idx
+            
+            for i in range(start_idx, len(response)):
+                if response[i] == '{':
+                    brace_count += 1
+                elif response[i] == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end_idx = i + 1
+                        break
+            
+            if brace_count != 0:
+                # Unmatched braces, try to find just the end
+                end_idx = response.rfind('}') + 1
+                if end_idx == 0:
+                    return None
+            
+            json_str = response[start_idx:end_idx]
+            
+            # Try to parse the JSON
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON decode error: {e}")
+                # Try to fix common JSON issues
+                fixed_json = self._fix_common_json_issues(json_str)
+                if fixed_json:
+                    try:
+                        return json.loads(fixed_json)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse even after fixing common issues")
+                        return None
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error extracting JSON from response: {e}")
+            return None
+    
+    def _fix_common_json_issues(self, json_str: str) -> Optional[str]:
+        """Fix common JSON formatting issues"""
+        try:
+            # Remove trailing commas
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*]', ']', json_str)
+            
+            # Fix unescaped quotes in strings
+            # This is a simple fix - in production you'd want more sophisticated handling
+            json_str = re.sub(r'(?<!\\)"(?=.*")', '\\"', json_str)
+            
+            # Fix line breaks in strings
+            json_str = json_str.replace('\n', '\\n')
+            
+            return json_str
+            
+        except Exception as e:
+            logger.error(f"Error fixing JSON issues: {e}")
+            return None
         
     async def _match_claims_to_sources(
         self,
@@ -167,7 +239,11 @@ class CitationAgent(BaseAgent):
         # Process claims
         for claim in claims:
             # First check if this claim matches a known finding
-            claim_text = claim["claim"].lower()
+            claim_text = claim.get("claim", "")
+            if not claim_text:
+                continue
+                
+            claim_text = claim_text.lower()
             matched_source = None
             
             # Check finding map
@@ -197,7 +273,7 @@ class CitationAgent(BaseAgent):
                 position = 0
                 
                 citations.append(Citation(
-                    claim_text=claim["text"],
+                    claim_text=claim.get("text", ""),
                     source_index=source_idx,
                     source_url=source.url,
                     source_title=source.title,
@@ -363,6 +439,11 @@ class CitationAgent(BaseAgent):
     def _text_similarity(self, text1: str, text2: str) -> float:
         """Calculate simple text similarity (0-1)"""
         # Simple implementation - in production use better similarity metrics
+        
+        # Add null checks
+        if not text1 or not text2:
+            return 0.0
+            
         text1_lower = text1.lower()
         text2_lower = text2.lower()
         

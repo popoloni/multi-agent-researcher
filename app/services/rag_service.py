@@ -211,33 +211,30 @@ class RAGService:
     async def _retrieve_relevant_documents(self, query: str, repo_id: str) -> List[ContextDocument]:
         """Retrieve relevant documents for context building"""
         try:
-            # Search for code and documentation using the shared vector service directly (same as KenobiAgent)
-            # Note: Removing repository filter for now since we only have one repository and filters seem to cause issues
-            vector_results = await self.vector_service.similarity_search(
+            # 🚨 CRITICAL FIX: Use vector_db_service instead of vector_service to find indexed content
+            vector_results = await self.vector_db_service.search_documents(
                 query=query,
+                repository_id=repo_id,  # Enable repository filtering
                 limit=self.max_context_documents,
-                filters=None
+                similarity_threshold=self.relevance_threshold
             )
             
             logger.info(f"Vector search for query '{query}' returned {len(vector_results)} results")
             
-            # Convert vector results to context documents  
+            # 🚨 CRITICAL FIX: Process vector_db_service results (different format than vector_service)
             context_documents = []
             for result in vector_results:
-                # Apply similarity threshold filter
-                if result.similarity_score < self.relevance_threshold:
-                    continue
-                
                 # Extract metadata
                 metadata = result.document.metadata if hasattr(result.document, 'metadata') else {}
-                doc_type = metadata.get('element_type', 'unknown')
+                doc_type = metadata.get('content_type', metadata.get('element_type', 'unknown'))
                 file_path = metadata.get('file_path')
+                line_numbers = (metadata.get('line_start'), metadata.get('line_end'))
                 
                 context_doc = ContextDocument(
                     content=result.document.content,
                     source_type=doc_type,
                     file_path=file_path,
-                    line_numbers=None,  # Vector service doesn't store line numbers directly
+                    line_numbers=line_numbers if line_numbers[0] is not None else None,
                     relevance_score=result.similarity_score,
                     metadata=metadata
                 )
@@ -304,13 +301,13 @@ class RAGService:
             # Extract relevant information from analysis
             analysis_data = analysis_result.analysis_result
             
-            # Build analysis context
+            # 🚨 CRITICAL FIX: Handle analysis_data fields safely
             context = {
                 "repository_id": repo_id,
-                "language": analysis_data.language,
-                "framework": analysis_data.framework,
-                "file_count": analysis_data.file_count,
-                "total_lines": analysis_data.total_lines,
+                "language": getattr(analysis_data, 'language', 'unknown'),
+                "framework": getattr(analysis_data, 'framework', None),
+                "file_count": getattr(analysis_data, 'file_count', 0),
+                "total_lines": getattr(analysis_data, 'total_lines', 0),
                 "code_snippets": []
             }
             

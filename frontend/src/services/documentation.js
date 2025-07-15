@@ -5,15 +5,34 @@ class DocumentationService {
     this.cache = new Map();
   }
 
-  // Get documentation generation status
+  // Get documentation generation status with extended timeout
   async getDocumentationStatus(repositoryId, taskId) {
-    return api.get(`/kenobi/repositories/${repositoryId}/documentation/status/${taskId}`);
+    return api.get(`/kenobi/repositories/${repositoryId}/documentation/status/${taskId}`, {
+      timeout: 30000, // 30 seconds timeout for status checks
+    });
   }
 
   // Poll documentation status until complete
   async pollDocumentationStatus(repositoryId, taskId, progressCallback) {
     let retries = 0;
-    const maxRetries = 60; // 5 minutes with 5-second intervals
+    let lastProgress = 0;
+    let stagnantCount = 0;
+    
+    // Get adaptive timeout based on model (try to get from API or use default)
+    let maxRetries = 180; // Default 15 minutes
+    try {
+      const settingsResponse = await api.get('/api/settings/all');
+      const settings = settingsResponse.data;
+      if (settings.DOCUMENTATION_MODEL) {
+        // Calculate timeout based on model type
+        const model = settings.DOCUMENTATION_MODEL.value;
+        maxRetries = this.calculateTimeoutForModel(model);
+      }
+    } catch (error) {
+      console.warn('Could not get model settings, using default timeout');
+    }
+    
+    const startTime = Date.now();
     
     while (retries < maxRetries) {
       try {
@@ -30,7 +49,35 @@ class DocumentationService {
           throw new Error(status.error || 'Documentation generation failed');
         }
         
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        // Check for progress stagnation
+        if (status.progress === lastProgress) {
+          stagnantCount++;
+          if (stagnantCount > 24) { // 2 minutes of no progress
+            console.warn('Documentation generation appears stagnant, but continuing...');
+          }
+        } else {
+          stagnantCount = 0;
+          lastProgress = status.progress;
+        }
+        
+        // Progressive timeout strategy - extend timeout if making progress
+        const elapsedMinutes = (Date.now() - startTime) / 60000;
+        if (elapsedMinutes > 10 && status.progress > 0) {
+          // If we're making progress after 10 minutes, extend timeout by 50%
+          if (retries > maxRetries * 0.8) {
+            maxRetries = Math.min(maxRetries * 1.5, 360); // Max 30 minutes
+          }
+        }
+        
+        // Adaptive polling interval based on progress and stage
+        let pollInterval = 5000; // Default 5 seconds
+        if (status.progress > 80) {
+          pollInterval = 2000; // Faster polling near completion
+        } else if (status.progress < 10) {
+          pollInterval = 7000; // Slower polling at start
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
         retries++;
       } catch (error) {
         console.error('Error polling documentation status:', error);
@@ -38,13 +85,43 @@ class DocumentationService {
       }
     }
     
-    throw new Error('Documentation generation timed out');
+    const timeoutMinutes = Math.round(maxRetries * 5 / 60);
+    throw new Error(`Documentation generation timed out after ${timeoutMinutes} minutes. This may be due to using a larger AI model that requires more processing time. Try using a smaller model or contact support.`);
+  }
+  
+  // Calculate timeout based on model type
+  calculateTimeoutForModel(model) {
+    const modelTimeouts = {
+      // Small models (fast)
+      'llama3.2:1b': 120,    // 10 minutes
+      'llama3.2:3b': 144,    // 12 minutes
+      'phi3:3.8b': 132,      // 11 minutes
+      
+      // Medium models
+      'llama3.1:8b': 180,    // 15 minutes
+      'mistral:7b': 156,     // 13 minutes
+      'gemma2:9b': 168,      // 14 minutes
+      'qwen2.5:7b': 168,     // 14 minutes
+      
+      // Large models (slow)
+      'llama3.1:70b': 360,   // 30 minutes
+      'mixtral:8x7b': 300,   // 25 minutes
+      
+      // Anthropic models (API-based, usually faster)
+      'claude-3-5-haiku-20241022': 96,      // 8 minutes
+      'claude-3-5-sonnet-20241022': 120,    // 10 minutes
+      'claude-4-sonnet-20241120': 144,      // 12 minutes
+      'claude-4-opus-20241120': 180,        // 15 minutes
+    };
+    
+    return modelTimeouts[model] || 180; // Default 15 minutes
   }
 
-  // Search documentation
+  // Search documentation with extended timeout
   async searchDocumentation(repositoryId, query, branch = 'main') {
     return api.get(`/kenobi/repositories/${repositoryId}/documentation/search`, {
-      params: { query, branch }
+      params: { query, branch },
+      timeout: 60000, // 1 minute timeout for search operations
     });
   }
 
@@ -113,10 +190,12 @@ class DocumentationService {
       };
     }
 
-    // Get from API
+    // Get from API with extended timeout
     try {
       console.log('Fetching from API');
-      const response = await api.get(`/kenobi/repositories/${repositoryId}/documentation?branch=${branch}`);
+      const response = await api.get(`/kenobi/repositories/${repositoryId}/documentation?branch=${branch}`, {
+        timeout: 120000, // 2 minutes timeout for fetching documentation
+      });
       
       if (response.data && response.data.documentation) {
         const docString = response.data.documentation;
@@ -158,13 +237,18 @@ class DocumentationService {
     }
   }
 
-  // Generate documentation
+  // Generate documentation with extended timeout
   async generateDocumentation(repositoryId, options = {}) {
     try {
-      const response = await api.post(`/kenobi/repositories/${repositoryId}/documentation`, options);
+      const response = await api.post(`/kenobi/repositories/${repositoryId}/documentation`, options, {
+        timeout: 180000, // 3 minutes timeout for documentation generation start
+      });
       return response;
     } catch (error) {
       console.error('Error generating documentation:', error);
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Documentation generation request timed out. The process may still be running in the background.');
+      }
       throw error;
     }
   }

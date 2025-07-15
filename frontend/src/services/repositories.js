@@ -25,8 +25,10 @@ cleanRepositoryPath('https://github.com/user/repo') → 'https://github.com/user
 */
 
 export const repositoryService = {
-  // Get all repositories
-  getRepositories: () => api.get('/kenobi/repositories'),
+  // Get all repositories with extended timeout
+  getRepositories: () => api.get('/kenobi/repositories', {
+    timeout: 120000, // 2 minutes timeout for repository loading
+  }),
   
   // Add remote repository with extended timeout
   addRepository: (repositoryData) => 
@@ -38,25 +40,32 @@ export const repositoryService = {
       }
     }),
   
-  // Get repository details
+  // Get repository details with extended timeout
   getRepositoryDetails: (repositoryId) => 
-    api.get(`/kenobi/repositories/${repositoryId}`),
+    api.get(`/kenobi/repositories/${repositoryId}`, {
+      timeout: 120000, // 2 minutes timeout for repository details
+    }),
   
-  // Create indexing (documentation generation)
+  // Create indexing (documentation generation) with extended timeout
   createIndexing: (repositoryId) => 
-    api.post(`/kenobi/repositories/${repositoryId}/index`),
+    api.post(`/kenobi/repositories/${repositoryId}/index`, {}, {
+      timeout: 600000, // 10 minutes timeout for indexing operations
+    }),
   
-  // Get repository analysis
+  // Get repository analysis with extended timeout
   getRepositoryAnalysis: (repositoryId) => 
-    api.get(`/kenobi/repositories/${repositoryId}/analysis`),
+    api.get(`/kenobi/repositories/${repositoryId}/analysis`, {
+      timeout: 180000, // 3 minutes timeout for analysis
+    }),
   
   // Delete repository
   deleteRepository: (repositoryId) => 
     api.delete(`/kenobi/repositories/${repositoryId}`),
   
-  // Get functionalities registry
+  // Get functionalities registry with extended timeout
   getFunctionalitiesRegistry: (repositoryId, branch) => 
     api.get(`/kenobi/repositories/${repositoryId}/functionalities`, {
-      params: { branch }
+      params: { branch },
+      timeout: 180000, // 3 minutes timeout for functionalities registry
     }),
 };

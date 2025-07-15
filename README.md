@@ -33,7 +33,7 @@ git clone https://github.com/popoloni/multi-agent-researcher.git
 cd multi-agent-researcher
 
 # Make scripts executable
-chmod +x start_all.sh start_dev.sh start_ui.sh
+chmod +x start_all.sh start_dev.sh start_ui.sh utils/*.sh
 
 # Start everything with one command
 ./start_all.sh
@@ -44,6 +44,30 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 ```
 
 **📖 For detailed setup instructions, see [docs/setup/SETUP_AND_DEPLOYMENT.md](docs/setup/SETUP_AND_DEPLOYMENT.md)**
+
+### 📁 Script Organization
+
+All utility scripts are now organized in the `utils/` folder for better project structure:
+
+- **Main scripts** (in project root - wrapper scripts for backwards compatibility):
+  - `start_all.sh` / `start_all.bat` - Start all services
+  - `start_dev.sh` - Start backend only
+  - `start_ui.sh` - Start frontend only
+  - `cleanup.sh` - Clean temporary files
+  - `verify_application.sh` - Verify system health
+
+- **Actual scripts** (in `utils/` folder):
+  - `utils/start_all.sh` - Main startup script with all features
+  - `utils/start_dev.sh` - Backend startup script
+  - `utils/start_ui.sh` - Frontend startup script
+  - `utils/cleanup.sh` - System cleanup script
+  - `utils/verify_application.sh` - Application verification
+  - `utils/configure_ai_provider.py` - AI provider configuration
+  - `utils/create_github_repo.sh` - GitHub repository setup
+  - `utils/demo_system.py` - System demonstration
+  - `utils/fix_documentation_issues.py` - Documentation fixes
+
+You can use either the wrapper scripts in the root directory or call the scripts directly from the `utils/` folder.
 
 ### Access the Application
 - **Frontend UI**: http://localhost:12001
@@ -57,16 +81,18 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 
 # Check system status
 ./start_all.sh status
-# or
-./check_status.sh
 
 # Stop all services
 ./start_all.sh stop
-# or
-./stop_all.sh
 
 # Restart all services
 ./start_all.sh restart
+
+# Download/update AI models
+./start_all.sh pull-models
+
+# View all available commands
+./start_all.sh help
 ```
 
 ## ✨ Key Features
@@ -78,19 +104,31 @@ chmod +x start_all.sh start_dev.sh start_ui.sh
 - **🏗️ Multi-Agent Architecture** - Specialized agents for orchestration, analysis, and dependencies
 - **🎯 Complete Workflow** - GitHub search → clone → index → AI documentation → documentation-aware chat
 
-## 🎉 Latest Improvements (v1.4.0)
+## 🎉 Latest Improvements (v1.6.0)
 
-### 💬 Fully Functional Obione Chat System
-- **AI-Powered Conversations**: Working chat interface with Ollama llama3.2:1b integration
+### 💬 Fully Functional Obione Chat System - ENHANCED & FIXED
+- **AI-Powered Conversations**: Working chat interface with Anthropic Claude and Ollama integration
 - **Repository Context Awareness**: Chat understands repository structure and answers code-specific questions
 - **Session Management**: Create and manage chat sessions with unique session IDs
 - **Modern UI**: Professional blue theme with enhanced message bubbles and loading animations
+- **🔥 CRITICAL FIX**: Resolved chat context issue - now provides repository-specific responses with actual file references
 
 ### 🚀 AI-Powered Documentation Generation
 - **Professional Content**: AI-generated descriptions using Ollama llama3.2:1b model
 - **Asynchronous Processing**: Background task processing with real-time progress tracking (0-100%)
-- **No More Timeouts**: Handles long-running generation (2-3 minutes) gracefully
+- **Extended Timeout Handling**: Intelligent timeout management for larger AI models (up to 30 minutes)
+- **Progressive Timeout Strategy**: Dynamically extends timeout based on generation progress
+- **Graceful Degradation**: Provides basic documentation even if AI generation fails
+- **Model-Specific Timeouts**: Automatic timeout adjustment based on model size and complexity
 - **Rich Context**: Generates comprehensive overviews, architecture analysis, and user guides
+
+### 🔍 Enhanced Vector Database & Context System
+- **Complete Vector Database Integration**: 167,341 content chunks indexed from 7,385 files
+- **Repository-Specific Context**: Chat responses now include actual file references and code snippets
+- **Automatic Content Indexing**: Integrated content indexing into repository analysis workflow
+- **RAG Service Enhancement**: Improved repository filtering and context quality
+- **Repair Endpoint**: Added ability to re-index existing repositories for better context
+- **Performance Optimization**: <5 seconds for contextual chat responses
 
 ### 🗂️ Enhanced Functionalities Registry
 - **Hierarchical Structure**: Tree view grouping functions by source files
@@ -167,10 +205,31 @@ OBIONE_MODEL=claude-4-sonnet-20241120              # Code analysis & chat
 # === DOCUMENTATION GENERATION ===
 DOCUMENTATION_MODEL=claude-4-sonnet-20241120       # Documentation generation
 
+# === DOCUMENTATION TIMEOUT CONFIGURATION ===
+DOCUMENTATION_TIMEOUT_BASE=900                      # Base timeout in seconds (15 minutes)
+DOCUMENTATION_TIMEOUT_PER_AI_CALL=120              # Additional timeout per AI call (2 minutes)
+DOCUMENTATION_MAX_TIMEOUT=1800                      # Maximum timeout (30 minutes)
+
 # === GOOGLE SEARCH (for research) ===
 GOOGLE_API_KEY=your_google_api_key_here
 GOOGLE_CSE_ID=your_cse_id_here
 ```
+
+#### **Timeout Configuration for Larger Models**
+
+When using larger AI models (like llama3.1:70b or claude-4-opus), documentation generation may take longer. The system now includes:
+
+- **Adaptive Timeouts**: Automatically adjusts timeout based on model type
+- **Progress-Based Extension**: Extends timeout if generation is making progress
+- **Individual AI Call Timeouts**: 5-minute timeout per AI call to prevent hanging
+- **Graceful Degradation**: Provides basic documentation if AI generation fails
+- **Real-time Progress Tracking**: Shows current stage and estimated completion time
+
+**Model Timeout Multipliers:**
+- Small models (llama3.2:1b): 1.0x (10 minutes)
+- Medium models (llama3.1:8b): 1.5x (15 minutes)  
+- Large models (llama3.1:70b): 3.0x (30 minutes)
+- Anthropic models: 0.8x - 1.5x (8-15 minutes)
 
 #### **Available Models**
 
@@ -339,7 +398,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed information about recent improveme
 ### Test Coverage
 ```bash
 # Run comprehensive tests
-./verify_application.sh
+./verify_application.sh  # or ./utils/verify_application.sh
 
 # Test specific workflows
 python demo/demo_working_features.py

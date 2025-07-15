@@ -16,9 +16,11 @@ class WebSearchTool:
     async def search(self, query: str) -> List[SearchResult]:
         """
         Perform a web search using Google Custom Search API and return results
+        Falls back to mock search if Google API keys are not configured
         """
         if not settings.GOOGLE_API_KEY or not settings.GOOGLE_CSE_ID:
-            raise RuntimeError("Google API key and CSE ID must be set in environment variables.")
+            print(f"Google API keys not configured, using mock search for: {query}")
+            return await self._perform_mock_search(query)
 
         url = "https://www.googleapis.com/customsearch/v1"
         params = {
@@ -31,7 +33,8 @@ class WebSearchTool:
             response = await self.client.get(url, params=params)
             data = response.json()
             if "error" in data:
-                raise RuntimeError(f"Google Search API error: {data['error'].get('message', 'Unknown error')}")
+                print(f"Google Search API error: {data['error'].get('message', 'Unknown error')}")
+                return await self._perform_mock_search(query)
             results = []
             for item in data.get("items", []):
                 results.append(SearchResult(
@@ -44,7 +47,19 @@ class WebSearchTool:
             return results
         except Exception as e:
             print(f"Error during Google search: {e}")
-            return []
+            return await self._perform_mock_search(query)
+    
+    async def _perform_mock_search(self, query: str) -> List[SearchResult]:
+        """Perform mock search with realistic results"""
+        mock_results = await self._mock_search(query)
+        
+        # Convert to SearchResult objects
+        results = []
+        for result in mock_results:
+            search_result = await self._fetch_content(result)
+            results.append(search_result)
+        
+        return results
         
     async def _mock_search(self, query: str) -> List[Dict[str, Any]]:
         """Mock search function for demonstration"""

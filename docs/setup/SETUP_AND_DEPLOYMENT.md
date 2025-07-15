@@ -102,7 +102,7 @@ EOL
 ### Step 4: Make Scripts Executable
 
 ```bash
-chmod +x start_all.sh start_dev.sh start_ui.sh stop_all.sh check_status.sh restart_backend.sh
+chmod +x start_all.sh start_dev.sh start_ui.sh verify_application.sh utils/*.sh
 ```
 
 ## Quick Start
@@ -127,9 +127,9 @@ This script will:
 **Alternative scripts:**
 - `./start_dev.sh` — Start backend + Ollama only
 - `./start_ui.sh` — Start frontend only
-- `./stop_all.sh` — Stop all services
-- `./check_status.sh` — Check status of all services
-- `./restart_backend.sh` — Restart backend API only
+- `./start_all.sh stop` — Stop all services
+- `./start_all.sh status` — Check status of all services
+- `./start_all.sh restart` — Restart all services
 
 ### Accessing the System
 
@@ -179,8 +179,6 @@ Ollama provides:
 ```bash
 # Check system status
 ./start_all.sh status
-# or
-./check_status.sh
 
 # Start all services
 source researcher-env/bin/activate  # Always activate first
@@ -188,13 +186,11 @@ source researcher-env/bin/activate  # Always activate first
 
 # Stop all services
 ./start_all.sh stop
-# or
-./stop_all.sh
 
 # Restart all services
 ./start_all.sh restart
 # or
-./restart_backend.sh
+./start_all.sh restart
 
 # Start only backend and Ollama
 source researcher-env/bin/activate
@@ -211,13 +207,9 @@ source researcher-env/bin/activate
 ```bash
 # 1. Stop all services
 ./start_all.sh stop
-# or
-./stop_all.sh
 
 # 2. Verify all services are stopped
 ./start_all.sh status
-# or
-./check_status.sh
 
 # 3. Activate virtual environment
 source researcher-env/bin/activate
@@ -259,7 +251,6 @@ python -m spacy download en_core_web_sm
 ```bash
 # Complete cleanup and restart
 ./start_all.sh stop
-./stop_all.sh
 pkill -f ollama
 pkill -f uvicorn
 pkill -f "npm start"

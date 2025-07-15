@@ -22,6 +22,7 @@ The Multi-Agent Research System provides a complete suite of tools for repositor
 
 ### 🔧 Setup & Deployment
 - **[Setup Guide](setup/SETUP_AND_DEPLOYMENT.md)** - Complete installation instructions
+- **[Startup Script Guide](STARTUP_SCRIPT_CONSOLIDATION.md)** - Script consolidation and migration guide
 - **[Deployment Guide](guides/deployment.md)** - Production deployment options
 - **[Configuration Guide](guides/configuration.md)** - Environment and model configuration
 

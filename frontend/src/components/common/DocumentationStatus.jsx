@@ -11,19 +11,14 @@ const DocumentationStatus = ({
 }) => {
   // Status can be: 'not_generated', 'generating', 'generated', 'failed', 'outdated'
   
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return null;
-    
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // Debug log to understand what's happening
+  React.useEffect(() => {
+    console.log('DocumentationStatus render:', { 
+      status, 
+      lastGenerated, 
+      calculatedTimeSince: getTimeSince(lastGenerated) 
     });
-  };
+  }, [status, lastGenerated]);
   
   // Calculate time since generation
   const getTimeSince = (dateString) => {
@@ -44,6 +39,9 @@ const DocumentationStatus = ({
         return `${diffHours} hours ago`;
       } else {
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        if (diffMinutes < 1) {
+          return 'Just now';
+        }
         return `${diffMinutes} minutes ago`;
       }
     }

@@ -26,7 +26,7 @@ pip install -r requirements.txt
 ### 3. Start the System
 ```bash
 # Make scripts executable
-chmod +x start_all.sh start_dev.sh start_ui.sh
+chmod +x start_all.sh start_dev.sh start_ui.sh utils/*.sh
 
 # Start everything with one command
 ./start_all.sh
@@ -181,7 +181,7 @@ ls -la /path/to/your/repository
 find /path/to/your/repository -name "*.py" -o -name "*.js" -o -name "*.java"
 
 # Check system status
-./check_status.sh
+./start_all.sh status
 ```
 
 ### Documentation Generation Issues

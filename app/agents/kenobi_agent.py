@@ -13,6 +13,7 @@ from app.models.repository_schemas import (
 )
 from app.services.repository_service import RepositoryService
 from app.services.indexing_service import IndexingService, SearchFilters
+from app.services.content_indexing_service import ContentIndexingService, ContentType
 from app.agents.code_search_agent import CodeSearchAgent
 from app.agents.categorization_agent import CategorizationAgent
 from app.tools.dependency_analyzer import DependencyAnalyzer
@@ -38,6 +39,7 @@ class KenobiAgent(BaseAgent):
         
         # Phase 2 capabilities
         self.indexing_service = IndexingService()
+        self.content_indexing_service = ContentIndexingService()
         self.code_search_agent = CodeSearchAgent()
         self.categorization_agent = CategorizationAgent()
         self.dependency_analyzer = DependencyAnalyzer()
@@ -90,6 +92,27 @@ Always think step by step and provide structured, actionable insights."""
         # Scan and analyze the repository
         repository = await self.repository_service.scan_local_directory(repo_path)
         analysis = await self.repository_service.analyze_repository(repository.id)
+        
+        # 🚨 CRITICAL FIX: Add content indexing integration
+        try:
+            print(f"🔄 Starting content indexing for repository {repository.id}")
+            indexing_progress = await self.content_indexing_service.index_repository_content(
+                repository_id=repository.id,
+                content_types=[ContentType.SOURCE_CODE, ContentType.DOCUMENTATION, ContentType.README, ContentType.COMMENTS]
+            )
+            print(f"✅ Content indexing completed: {indexing_progress.indexed_chunks} chunks indexed")
+        except Exception as e:
+            print(f"⚠️ Content indexing failed: {e}")
+            # Continue with analysis even if indexing fails
+        
+        # 🚨 CRITICAL FIX: Add vector database population
+        try:
+            print(f"🔄 Adding repository content to vector database")
+            vector_result = await self.vector_add_repository(repository)
+            print(f"✅ Vector database updated: {vector_result['elements_added']} elements added")
+        except Exception as e:
+            print(f"⚠️ Vector database population failed: {e}")
+            # Continue with analysis even if vector population fails
         
         # Enhance analysis with AI insights
         enhanced_analysis = await self._enhance_analysis_with_ai(analysis)
@@ -657,32 +680,65 @@ Always think step by step and provide structured, actionable insights."""
     async def vector_add_repository(self, repository: Repository) -> Dict[str, Any]:
         """Add repository to vector database"""
         
-        # Get all elements for the repository
-        filters = SearchFilters()
-        filters.repositories = [repository.id]
-        candidates = self.indexing_service._get_search_candidates(filters)
-        
-        added_count = 0
-        failed_count = 0
-        
-        for candidate in candidates:
+        # 🚨 CRITICAL FIX: Use content indexing service instead of old indexing service
+        try:
+            # Get content statistics from the content indexing service
+            content_stats = await self.content_indexing_service.get_repository_content_stats(repository.id)
+            
+            # The content indexing service already adds content to the vector database
+            # through the vector_database_service, so we just need to report the stats
+            added_count = content_stats.get('total_documents', 0)
+            failed_count = 0
+            
+            print(f"✅ Vector database already populated by content indexing service: {added_count} documents")
+            
+            return {
+                'repository_id': repository.id,
+                'elements_added': added_count,
+                'elements_failed': failed_count,
+                'total_processed': added_count + failed_count
+            }
+            
+        except Exception as e:
+            print(f"❌ Failed to get vector database statistics: {e}")
+            
+            # 🚨 FALLBACK: Try old indexing service approach
+            print("🔄 Falling back to old indexing service approach...")
             try:
-                element = self.indexing_service._deserialize_element(candidate)
-                success = await self.vector_service.add_code_element(element, repository)
-                if success:
-                    added_count += 1
-                else:
-                    failed_count += 1
-            except Exception as e:
-                print(f"Failed to add element to vector DB: {e}")
-                failed_count += 1
-        
-        return {
-            'repository_id': repository.id,
-            'elements_added': added_count,
-            'elements_failed': failed_count,
-            'total_processed': added_count + failed_count
-        }
+                filters = SearchFilters()
+                filters.repositories = [repository.id]
+                candidates = self.indexing_service._get_search_candidates(filters)
+                
+                added_count = 0
+                failed_count = 0
+                
+                for candidate in candidates:
+                    try:
+                        element = self.indexing_service._deserialize_element(candidate)
+                        success = await self.vector_service.add_code_element(element, repository)
+                        if success:
+                            added_count += 1
+                        else:
+                            failed_count += 1
+                    except Exception as e:
+                        print(f"Failed to add element to vector DB: {e}")
+                        failed_count += 1
+                
+                return {
+                    'repository_id': repository.id,
+                    'elements_added': added_count,
+                    'elements_failed': failed_count,
+                    'total_processed': added_count + failed_count
+                }
+                
+            except Exception as fallback_error:
+                print(f"❌ Fallback approach also failed: {fallback_error}")
+                return {
+                    'repository_id': repository.id,
+                    'elements_added': 0,
+                    'elements_failed': 0,
+                    'total_processed': 0
+                }
     
     async def vector_similarity_search(self, query: str, limit: int = 10, 
                                      filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -1141,7 +1197,9 @@ Always think step by step and provide structured, actionable insights."""
 
             # Build context for the AI
             context_text = f"Repository: {repository.name}\n"
-            context_text += f"Language: {repository.language}\n"
+            # 🚨 CRITICAL FIX: Handle language field correctly (repository is a dict, not a Pydantic model)
+            language = repository.language if hasattr(repository, 'language') else getattr(repository, 'language', 'unknown')
+            context_text += f"Language: {language}\n"
             context_text += f"Branch: {branch}\n\n"
             
             if context_elements:

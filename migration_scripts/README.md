@@ -96,7 +96,7 @@ Migration scripts are used to:
 ### Running Migration Scripts
 
 1. **Backup your data** before running any migration script
-2. **Stop all services** using `./stop_all.sh`
+2. **Stop all services** using `./start_all.sh stop`
 3. **Run the migration script**:
    ```bash
    cd migration_scripts

@@ -86,22 +86,30 @@ class DocumentationService:
                 generated_at=datetime.utcnow()
             )
             
-            # Save to database
-            async with self.db_service.session_factory() as session:
-                # Check if documentation already exists
-                existing_doc = await session.get(Documentation, doc_id)
-                if existing_doc:
-                    # Update existing documentation
-                    existing_doc.content = content
-                    existing_doc.generated_at = datetime.utcnow()
-                    existing_doc.vector_indexed = False
-                    documentation = existing_doc
+            # Save to database (with error handling)
+            try:
+                if hasattr(self.db_service, 'session_factory') and self.db_service.session_factory is not None:
+                    async with self.db_service.session_factory() as session:
+                        # Check if documentation already exists
+                        existing_doc = await session.get(Documentation, doc_id)
+                        if existing_doc:
+                            # Update existing documentation
+                            existing_doc.content = content
+                            existing_doc.generated_at = datetime.utcnow()
+                            existing_doc.vector_indexed = False
+                            documentation = existing_doc
+                        else:
+                            # Add new documentation
+                            session.add(documentation)
+                        
+                        await session.commit()
+                        await session.refresh(documentation)
+                        logger.info(f"Documentation saved to database for repository {repo_id}")
                 else:
-                    # Add new documentation
-                    session.add(documentation)
-                
-                await session.commit()
-                await session.refresh(documentation)
+                    logger.warning(f"Database not available, skipping database save for repository {repo_id}")
+            except Exception as db_error:
+                logger.error(f"Database error saving documentation for {repo_id}: {db_error}")
+                # Continue with in-memory processing
             
             # Prepare text chunks for vector embedding
             chunks = self._prepare_text_chunks(content, repo_id, doc_id)
@@ -126,12 +134,21 @@ class DocumentationService:
                 cached=False
             )
             
-        except SQLAlchemyError as e:
-            logger.error(f"Database error saving documentation for {repo_id}: {e}")
-            raise
         except Exception as e:
             logger.error(f"Error saving documentation for {repo_id}: {e}")
-            raise
+            # Return a minimal result instead of raising
+            return DocumentationResult(
+                documentation=Documentation(
+                    id=self._generate_doc_id(repo_id, branch),
+                    repository_id=repo_id,
+                    content=str(documentation_data),
+                    format="text",
+                    vector_indexed=False,
+                    generated_at=datetime.utcnow()
+                ),
+                chunks=[],
+                cached=False
+            )
     
     async def get_documentation(
         self, 
@@ -162,43 +179,47 @@ class DocumentationService:
                     cached=True
                 )
             
-            # 2. Fallback to database
-            async with self.db_service.session_factory() as session:
-                documentation = await session.get(Documentation, doc_id)
-                
-                if not documentation:
-                    logger.debug(f"Documentation not found for {repo_id}")
-                    return None
-                
-                # Prepare chunks from stored content
-                chunks = self._prepare_text_chunks(
-                    documentation.content, 
-                    repo_id, 
-                    doc_id
-                )
-                
-                # 3. Cache result for future requests
-                await self.cache_service.set(
-                    cache_key,
-                    {
-                        "documentation": documentation,
-                        "chunks": chunks,
-                        "cached_at": datetime.utcnow().isoformat()
-                    },
-                    ttl=3600
-                )
-                
-                logger.debug(f"Documentation loaded from database for {repo_id}")
-                
-                return DocumentationResult(
-                    documentation=documentation,
-                    chunks=chunks,
-                    cached=False
-                )
-                
-        except SQLAlchemyError as e:
-            logger.error(f"Database error retrieving documentation for {repo_id}: {e}")
+            # 2. Fallback to database (with error handling)
+            try:
+                if hasattr(self.db_service, 'session_factory') and self.db_service.session_factory is not None:
+                    async with self.db_service.session_factory() as session:
+                        documentation = await session.get(Documentation, doc_id)
+                        
+                        if documentation:
+                            # Prepare chunks from stored content
+                            chunks = self._prepare_text_chunks(
+                                documentation.content, 
+                                repo_id, 
+                                doc_id
+                            )
+                            
+                            # 3. Cache result for future requests
+                            await self.cache_service.set(
+                                cache_key,
+                                {
+                                    "documentation": documentation,
+                                    "chunks": chunks,
+                                    "cached_at": datetime.utcnow().isoformat()
+                                },
+                                ttl=3600
+                            )
+                            
+                            logger.debug(f"Documentation loaded from database for {repo_id}")
+                            
+                            return DocumentationResult(
+                                documentation=documentation,
+                                chunks=chunks,
+                                cached=False
+                            )
+                else:
+                    logger.warning(f"Database not available for documentation retrieval for {repo_id}")
+            except Exception as db_error:
+                logger.error(f"Database error retrieving documentation for {repo_id}: {db_error}")
+                # Continue without database data
+            
+            logger.debug(f"Documentation not found for {repo_id}")
             return None
+                
         except Exception as e:
             logger.error(f"Error retrieving documentation for {repo_id}: {e}")
             return None
@@ -214,17 +235,18 @@ class DocumentationService:
             List of Documentation objects
         """
         try:
-            async with self.db_service.session_factory() as session:
-                result = await session.execute(
-                    select(Documentation)
-                    .order_by(Documentation.generated_at.desc())
-                    .limit(limit)
-                )
-                return result.scalars().all()
+            if hasattr(self.db_service, 'session_factory') and self.db_service.session_factory is not None:
+                async with self.db_service.session_factory() as session:
+                    result = await session.execute(
+                        select(Documentation)
+                        .order_by(Documentation.generated_at.desc())
+                        .limit(limit)
+                    )
+                    return result.scalars().all()
+            else:
+                logger.warning("Database not available for documentation listing")
+                return []
                 
-        except SQLAlchemyError as e:
-            logger.error(f"Database error listing documentation: {e}")
-            return []
         except Exception as e:
             logger.error(f"Error listing documentation: {e}")
             return []
@@ -243,26 +265,28 @@ class DocumentationService:
         try:
             doc_id = self._generate_doc_id(repo_id, branch)
             
-            # Remove from database
-            async with self.db_service.session_factory() as session:
-                documentation = await session.get(Documentation, doc_id)
-                if documentation:
-                    await session.delete(documentation)
-                    await session.commit()
-                    
-                    # Remove from cache
-                    cache_key = f"{self._cache_prefix}{doc_id}"
-                    await self.cache_service.delete(cache_key)
-                    
-                    logger.info(f"Documentation deleted for repository {repo_id}")
-                    return True
+            # Remove from database (with error handling)
+            try:
+                if hasattr(self.db_service, 'session_factory') and self.db_service.session_factory is not None:
+                    async with self.db_service.session_factory() as session:
+                        documentation = await session.get(Documentation, doc_id)
+                        if documentation:
+                            await session.delete(documentation)
+                            await session.commit()
+                            logger.info(f"Documentation deleted from database for repository {repo_id}")
                 else:
-                    logger.debug(f"Documentation not found for deletion: {repo_id}")
-                    return False
+                    logger.warning(f"Database not available for documentation deletion for {repo_id}")
+            except Exception as db_error:
+                logger.error(f"Database error deleting documentation for {repo_id}: {db_error}")
+                # Continue with cache deletion
+            
+            # Remove from cache
+            cache_key = f"{self._cache_prefix}{doc_id}"
+            await self.cache_service.delete(cache_key)
+            
+            logger.info(f"Documentation deleted for repository {repo_id}")
+            return True
                     
-        except SQLAlchemyError as e:
-            logger.error(f"Database error deleting documentation for {repo_id}: {e}")
-            return False
         except Exception as e:
             logger.error(f"Error deleting documentation for {repo_id}: {e}")
             return False

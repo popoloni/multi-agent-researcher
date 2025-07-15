@@ -14,6 +14,7 @@ import shutil
 from app.agents.lead_agent import LeadResearchAgent
 from app.agents.citation_agent import CitationAgent
 from app.agents.kenobi_agent import KenobiAgent
+from app.services.content_indexing_service import ContentType
 from app.models.schemas import (
     ResearchQuery, ResearchResult, SearchResult, DetailedResearchStatus,
     ResearchProgress, ResearchHistoryItem, ResearchAnalytics, 
@@ -1350,6 +1351,66 @@ async def recover_repository(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Repository recovery failed: {str(e)}")
+
+@app.post("/kenobi/repositories/{repository_id}/reindex")
+async def reindex_repository(repository_id: str) -> Dict[str, Any]:
+    """
+    🚨 CRITICAL FIX: Re-index repository content and vector database
+    
+    This endpoint fixes the Obione Chat context issue by:
+    1. Re-indexing repository content using ContentIndexingService
+    2. Populating the vector database with repository content
+    3. Enabling repository-specific chat responses
+    
+    Args:
+        repository_id: Repository ID to re-index
+        
+    Returns:
+        Dict containing indexing results and metrics
+    """
+    try:
+        # Check if repository exists
+        repository = await kenobi_agent.repository_service.get_repository_metadata(repository_id)
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        print(f"🔄 Starting re-indexing for repository {repository_id}")
+        
+        # Trigger content indexing using the new integrated service
+        indexing_progress = await kenobi_agent.content_indexing_service.index_repository_content(
+            repository_id=repository.id,
+            content_types=[ContentType.SOURCE_CODE, ContentType.DOCUMENTATION, ContentType.README, ContentType.COMMENTS]
+        )
+        
+        # Update vector database  
+        vector_result = await kenobi_agent.vector_add_repository(repository)
+        
+        print(f"✅ Re-indexing completed: {indexing_progress.indexed_chunks} chunks, {vector_result['elements_added']} elements added")
+        
+        return {
+            "status": "success",
+            "repository_id": repository_id,
+            "repository_name": repository.name,
+            "indexing_results": {
+                "total_files": indexing_progress.total_files,
+                "processed_files": indexing_progress.processed_files,
+                "total_chunks": indexing_progress.total_chunks,
+                "indexed_chunks": indexing_progress.indexed_chunks,
+                "failed_chunks": indexing_progress.failed_chunks,
+                "processing_time": (datetime.now() - indexing_progress.start_time).total_seconds()
+            },
+            "vector_results": {
+                "elements_added": vector_result['elements_added'],
+                "elements_failed": vector_result['elements_failed'],
+                "total_processed": vector_result['total_processed']
+            },
+            "message": "Repository content re-indexed successfully. Chat should now provide repository-specific responses.",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Re-indexing failed for repository {repository_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Re-indexing failed: {str(e)}")
 
 @app.post("/kenobi/repositories/{repository_id}/documentation")
 async def generate_documentation(repository_id: str, background_tasks: BackgroundTasks, options: Dict[str, Any] = None) -> Dict[str, Any]:

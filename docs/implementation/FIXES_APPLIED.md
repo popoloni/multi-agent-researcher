@@ -83,7 +83,7 @@ python fix_documentation_issues.py
 ### Step 2: Restart Backend
 ```bash
 # Restart the backend server to load changes
-./restart_backend.sh
+./start_all.sh restart
 ```
 
 ### Step 3: Test the Fixes

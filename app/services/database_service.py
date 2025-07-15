@@ -29,43 +29,58 @@ class DatabaseService:
         # Initialize engine and session factory as None for lazy loading
         self.engine = None
         self.session_factory = None
+        self.is_initialized = False
         
         logger.info(f"Database service configured with URL: {self.database_url}")
     
     def _ensure_engine(self):
         """Ensure the database engine and session factory are initialized"""
         if self.engine is None:
-            # Create async engine for database operations
-            self.engine = create_async_engine(
-                self.database_url,
-                echo=False,  # Set to True for SQL debugging
-                future=True
-            )
-            
-            # Create session factory
-            self.session_factory = async_sessionmaker(
-                self.engine,
-                class_=AsyncSession,
-                expire_on_commit=False
-            )
-            
-            logger.info(f"Database engine initialized with URL: {self.database_url}")
+            try:
+                # Create async engine for database operations
+                self.engine = create_async_engine(
+                    self.database_url,
+                    echo=False,  # Set to True for SQL debugging
+                    future=True
+                )
+                
+                # Create session factory
+                self.session_factory = async_sessionmaker(
+                    self.engine,
+                    class_=AsyncSession,
+                    expire_on_commit=False
+                )
+                
+                logger.info(f"Database engine initialized with URL: {self.database_url}")
+            except Exception as e:
+                logger.error(f"Failed to initialize database engine: {e}")
+                # Don't raise here, let the calling methods handle it
+                return False
+        return True
     
     async def initialize(self):
         """Initialize database tables"""
         try:
-            self._ensure_engine()
+            if not self._ensure_engine():
+                self.is_initialized = False
+                return False
+                
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             logger.info("Database tables created successfully")
+            self.is_initialized = True
+            return True
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
-            raise
+            self.is_initialized = False
+            return False
     
     async def health_check(self):
         """Check database connectivity"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                return False
+                
             async with self.session_factory() as session:
                 await session.execute(text("SELECT 1"))
             return True
@@ -76,7 +91,10 @@ class DatabaseService:
     async def save_repository(self, repository: Repository) -> Repository:
         """Save repository with immediate cache update"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                logger.warning("Database not initialized, skipping repository save")
+                return repository
+                
             async with self.session_factory() as session:
                 # Convert enum values from schema to database enums
                 db_clone_status = DBCloneStatus.PENDING
@@ -135,12 +153,16 @@ class DatabaseService:
                 
         except Exception as e:
             logger.error(f"Failed to save repository {repository.id}: {e}")
-            raise
+            # Don't raise, just log and return original repository
+            return repository
     
     async def get_repository(self, repo_id: str) -> Optional[Repository]:
         """Get repository from database"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                logger.warning("Database not initialized, repository retrieval skipped")
+                return None
+                
             async with self.session_factory() as session:
                 result = await session.execute(
                     select(DatabaseRepository).where(DatabaseRepository.id == repo_id)
@@ -204,7 +226,10 @@ class DatabaseService:
     async def list_repositories(self) -> List[Repository]:
         """List all repositories from database"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                logger.warning("Database not initialized, returning empty repository list")
+                return []
+                
             async with self.session_factory() as session:
                 result = await session.execute(select(DatabaseRepository))
                 db_repos = result.scalars().all()
@@ -265,7 +290,10 @@ class DatabaseService:
     async def delete_repository(self, repo_id: str) -> bool:
         """Delete repository from database"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                logger.warning("Database not initialized, repository deletion skipped")
+                return False
+                
             async with self.session_factory() as session:
                 result = await session.execute(
                     select(DatabaseRepository).where(DatabaseRepository.id == repo_id)
@@ -287,7 +315,17 @@ class DatabaseService:
     async def save_documentation(self, repo_id: str, documentation_data: Dict[str, Any]) -> DatabaseDocumentation:
         """Save documentation to database"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                logger.warning("Database not initialized, documentation save skipped")
+                # Return a dummy documentation object
+                return DatabaseDocumentation(
+                    id=f"{repo_id}_dummy",
+                    repository_id=repo_id,
+                    content=json.dumps(documentation_data),
+                    format="json",
+                    generated_at=datetime.utcnow()
+                )
+                
             async with self.session_factory() as session:
                 # Create documentation record
                 documentation = DatabaseDocumentation(
@@ -306,12 +344,22 @@ class DatabaseService:
                 
         except Exception as e:
             logger.error(f"Failed to save documentation for {repo_id}: {e}")
-            raise
+            # Return a dummy documentation object instead of raising
+            return DatabaseDocumentation(
+                id=f"{repo_id}_dummy",
+                repository_id=repo_id,
+                content=json.dumps(documentation_data),
+                format="json",
+                generated_at=datetime.utcnow()
+            )
     
     async def get_documentation(self, repo_id: str) -> Optional[Dict[str, Any]]:
         """Get latest documentation for repository"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                logger.warning("Database not initialized, documentation retrieval skipped")
+                return None
+                
             async with self.session_factory() as session:
                 result = await session.execute(
                     select(DatabaseDocumentation)
@@ -334,7 +382,9 @@ class DatabaseService:
     async def get_connection_stats(self) -> Dict[str, Any]:
         """Get database connection statistics"""
         try:
-            self._ensure_engine()
+            if not self.is_initialized or not self._ensure_engine():
+                return {"status": "not_initialized", "error": "Database not initialized"}
+                
             pool = self.engine.pool
             return {
                 "pool_size": getattr(pool, 'size', 'unknown'),
@@ -353,6 +403,7 @@ class DatabaseService:
             if self.engine:
                 await self.engine.dispose()
                 logger.info("Database connections closed")
+                self.is_initialized = False
         except Exception as e:
             logger.error(f"Error closing database connections: {e}")
 

@@ -402,23 +402,11 @@ class ContentIndexingService:
     async def _get_repository(self, repository_id: str) -> Optional[Repository]:
         """Get repository information from database"""
         try:
-            async with self.db_service.session_factory() as session:
-                from sqlalchemy import text
-                result = await session.execute(
-                    text("SELECT * FROM repositories WHERE id = ?"),
-                    (repository_id,)
-                )
-                row = result.fetchone()
-                
-                if row:
-                    return Repository(
-                        id=row[0],
-                        name=row[1],
-                        url=row[2],
-                        local_path=row[3],
-                        # Add other fields as needed
-                    )
-                return None
+            # 🚨 CRITICAL FIX: Use repository service instead of direct database query
+            from app.services.repository_service import RepositoryService
+            repository_service = RepositoryService()
+            repository = await repository_service.get_repository_metadata(repository_id)
+            return repository
                 
         except Exception as e:
             logger.error(f"Failed to get repository {repository_id}: {e}")
