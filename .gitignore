@@ -162,4 +162,4 @@ uploads/
 
 # Monitoring and Analytics
 *.analytics
-*.metrics
+*.metrics*.backup_*
