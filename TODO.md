@@ -1,5 +1,204 @@
 # Multi-Agent Research System - TODO
 
+## 🚧 PENDING & MISSING FEATURES
+
+### 0. Test Suite & Non-Regression Testing
+- **Goal:** Ensure all changes are safe, tested, and do not break existing functionality; enable easy extension of tests as new features are added. This suite must be implemented and running before new features are developed, and every new functionality must be fully tested against it.
+    - [ ] Review and audit the current set of tests (unit, integration, API, frontend, etc.):
+        - [ ] Identify gaps, outdated tests, and areas lacking coverage.
+        - [ ] Consolidate all critical tests into a unified non-regression test suite.
+    - [ ] Design the test system for modularity and extensibility:
+        - [ ] Organize tests by module/component (API, backend, frontend, agents, docgen, etc.).
+        - [ ] Use a standard structure and naming convention for easy discovery and addition of new tests.
+        - [ ] Provide clear documentation and templates for adding new tests as features are implemented and consolidated.
+    - [ ] Automate non-regression test execution:
+        - [ ] Integrate the test suite into the CI/CD pipeline to run after every change (commit, PR, or deployment).
+        - [ ] Ensure test results are visible to developers and block merges on failure.
+    - [ ] Add reporting and diagnostics:
+        - [ ] Generate clear reports on test coverage, failures, and regressions.
+        - [ ] Provide logs and diagnostics for failed tests to speed up debugging.
+    - [ ] Maintain and update the test suite:
+        - [ ] Regularly review and refactor tests to keep them up to date with the evolving codebase.
+        - [ ] Remove obsolete tests and add new ones as features mature.
+    - [ ] Document the test system, how to run/extend it, and best practices for non-regression testing.
+    - [ ] Add meta-tests to ensure the test system itself is working (e.g., test discovery, reporting, CI integration).
+    - [ ] **Enhance the suite for new features:**
+        - [ ] For every new functionality added, incorporate comprehensive tests for it into the non-regression suite as part of the implementation process.
+
+### 1. Core Infrastructure & Data Management
+- **Goal:** Centralize all runtime data and logs for maintainability and deployment flexibility.
+    - [ ] Add a configuration option (env var and/or config file) to set a base working directory for all runtime data (default to current behavior if not set).
+    - [ ] Refactor repository download logic:
+        - [ ] Store all cloned GitHub repositories under `<working_folder>/repos/<org>/<repo>`.
+        - [ ] Update all code that references repo paths to use the new structure.
+        - [ ] Add migration script to move existing repos to the new structure.
+    - [ ] Move all database files (kenobi.db, backups, etc.) into `<working_folder>/db/`:
+        - [ ] Update DB initialization and backup scripts to use the new path.
+        - [ ] Add migration script for existing DB files.
+    - [ ] Refactor all logging:
+        - [ ] Write logs to `<working_folder>/logs/`.
+        - [ ] Create subfolders for each log type (e.g., `<working_folder>/logs/chat/`, `<working_folder>/logs/indexing/`, `<working_folder>/logs/errors/`).
+        - [ ] Update all logger initializations and handlers to use the new structure.
+        - [ ] Add log rotation and cleanup policy.
+    - [ ] Remove all hardcoded paths from the codebase; use config everywhere.
+    - [ ] Update documentation and deployment scripts to reflect the new structure.
+    - [ ] Provide migration/utility scripts to move existing data to the new structure and validate after migration.
+    - [ ] Add tests to ensure all services use the working folder correctly.
+
+### 2. Notification System & Long-Running Task Management
+- **Goal:** Ensure users can always track and be notified about the status of long-running tasks, regardless of navigation or session.
+    - [ ] Design a unified notification/task system:
+        - [ ] Define a backend model for tasks (type, status, progress, owner, timestamps, result, error, etc.).
+        - [ ] Implement persistent storage for task status (DB table or cache).
+        - [ ] Refactor all long-running operations (repo download, indexing, doc generation, etc.) to register and update their status in the task system.
+    - [ ] Backend API changes:
+        - [ ] Add endpoints to query running/completed tasks by user/session.
+        - [ ] Add endpoints to subscribe to task updates (websocket or long-polling).
+        - [ ] Add endpoints to cancel or retry tasks.
+    - [ ] Frontend changes:
+        - [ ] Implement a notification/task center UI component accessible from all pages.
+        - [ ] Show real-time progress and status for all user tasks.
+        - [ ] Display notifications for task completion, errors, and important events (toast, badge, etc.).
+        - [ ] Allow users to view task history and details.
+    - [ ] Real-time updates:
+        - [ ] Use websockets or polling to push task status changes to the frontend.
+        - [ ] Ensure updates are delivered even if the user navigates away and returns.
+    - [ ] Document the new notification and task management system with API/UI usage examples.
+    - [ ] Add integration and unit tests for task tracking and notification delivery.
+
+### 3. Documentation Generation Quality & Completeness
+- **Goal:** Produce comprehensive, accurate, and useful documentation for all repositories.
+    - [ ] Audit the current document generation pipeline:
+        - [ ] Identify missing features, incomplete sections, and scope limitations.
+        - [ ] Review prompt templates and LLM context windows for truncation or loss of information.
+    - [ ] Remove or raise artificial limits:
+        - [ ] Increase max tokens/context for LLM calls if possible.
+        - [ ] Allow full codebase traversal and documentation, not just top-level files.
+        - [ ] Add support for large file chunking and aggregation.
+    - [ ] Improve prompt engineering and context extraction:
+        - [ ] Refine prompts to extract architectural, data model, and workflow information.
+        - [ ] Add codebase-wide summary and cross-file linking.
+        - [ ] Use file/folder hierarchy to inform documentation structure.
+    - [ ] Add validation and review steps:
+        - [ ] Implement automated checks for missing/empty sections in generated docs.
+        - [ ] Add manual review workflow for users to flag incomplete or inaccurate docs.
+    - [ ] Collect user feedback:
+        - [ ] Add UI for users to rate or comment on generated documentation.
+        - [ ] Use feedback to iteratively improve prompts and logic.
+    - [ ] Update documentation to reflect the improved process and new features.
+    - [ ] Add tests to ensure completeness and accuracy of generated documentation.
+
+### 4. Integration of Advanced DocGen Tools
+- **Goal:** Enable on-demand, advanced documentation generation using the docgen_tools suite.
+    - [ ] Analyze docgen_tools features:
+        - [ ] Review CLI, config, and API support for Anthropic and AWS Bedrock.
+        - [ ] Document how linking, summarization, and Word export are implemented.
+        - [ ] Identify all input/output requirements and supported languages.
+    - [ ] Design integration plan:
+        - [ ] Define how the main app will trigger docgen_tools (subprocess, API call, or direct import).
+        - [ ] Specify how to pass configuration and source code paths from the main app.
+        - [ ] Plan for capturing logs, progress, and errors from docgen_tools runs.
+    - [ ] Backend implementation:
+        - [ ] Add new API endpoints to encapsulate each docgen_tools functionality (generate docs, add links, export Word, etc.).
+        - [ ] Implement job/task management for long-running docgen_tools operations (reuse notification/task system).
+        - [ ] Store and serve generated outputs (markdown, Word) in the main app's documentation storage.
+        - [ ] Handle cleanup and error recovery for failed docgen_tools runs.
+    - [ ] Frontend integration:
+        - [ ] Add UI options for users to select advanced docgen mode and configure options (provider, style, output format).
+        - [ ] Show progress, logs, and allow download/viewing of results.
+        - [ ] Integrate with notification/task center for status updates.
+    - [ ] Compatibility:
+        - [ ] Ensure docgen_tools outputs are compatible with existing documentation viewers and workflows.
+        - [ ] Add migration/utility scripts if needed to convert between formats.
+    - [ ] Documentation:
+        - [ ] Document the integration, usage, and troubleshooting of advanced docgen features.
+    - [ ] Add integration and end-to-end tests for docgen_tools workflows.
+
+### 5. Authentication & User Management
+- **Goal:** Secure the system and enable user-specific features.
+    - [ ] Integrate a user authentication system (OAuth2, JWT, or FastAPI Users):
+        - [ ] Add user registration, login, logout, and session management endpoints.
+        - [ ] Store user credentials securely (hashed passwords, OAuth tokens, etc.).
+        - [ ] Implement password reset and email verification flows.
+    - [ ] Add user roles and permissions:
+        - [ ] Define roles (admin, user, guest, etc.) and access control policies.
+        - [ ] Restrict sensitive endpoints and UI features based on roles.
+    - [ ] Frontend changes:
+        - [ ] Add authentication flows (login, registration, password reset) to the UI.
+        - [ ] Display user-specific data (repositories, research, chat history).
+        - [ ] Show/hide features based on user role.
+    - [ ] Associate all user data (repos, research, chat) with user accounts in the DB.
+    - [ ] Update documentation for authentication and user management.
+    - [ ] Add tests for all authentication and authorization flows.
+
+### 6. Monitoring, Analytics & Performance
+- **Goal:** Provide visibility into system health, usage, performance, and provider/model status.
+    - [ ] Integrate a monitoring solution (Prometheus, Grafana, or logging/metrics library):
+        - [ ] Instrument backend services with metrics (CPU, memory, request latency, error rates, etc.).
+        - [ ] Expose metrics endpoints for scraping/visualization.
+    - [ ] Add dashboards for system health and performance statistics.
+    - [ ] Implement advanced analytics:
+        - [ ] Track usage stats (active users, repo activity, feature usage).
+        - [ ] Log user activity and important events for auditing.
+    - [ ] Add alerting:
+        - [ ] Configure alerts for critical failures, performance degradation, or security incidents.
+    - [ ] Provider/model status and visibility:
+        - [ ] Implement health checks and status endpoints for all AI/model providers (Ollama, Anthropic, Bedrock, etc.).
+        - [ ] Display provider/model status and availability in the admin dashboard and monitoring UI.
+        - [ ] Log and expose which model/provider is used for each task (API, backend logs, and optionally in the UI for transparency).
+        - [ ] Add alerts for provider/model failures, degraded performance, or quota issues.
+    - [ ] Document deployment and use of the monitoring/analytics stack, including provider/model monitoring.
+    - [ ] Add tests for metrics, analytics, and provider/model status endpoints.
+
+### 7. Repository & Research Features
+- **Goal:** Enhance repository management and research workflows.
+    - [ ] Batch operations for repositories:
+        - [ ] Implement backend endpoints for batch indexing, analysis, and repair.
+        - [ ] Add frontend UI for selecting and operating on multiple repositories.
+        - [ ] Add progress tracking, error handling, and retry logic for batch jobs.
+        - [ ] Ensure batch operations are idempotent and safe for concurrent use.
+    - [ ] Integration APIs and webhooks:
+        - [ ] Design and implement APIs for third-party integrations (webhooks for repo events, external triggers for analysis/doc generation).
+        - [ ] Add configuration UI for users to register/manage webhooks and integrations.
+        - [ ] Ensure all integration points are secure and authenticated.
+        - [ ] Document available integrations and how to use them.
+    - [ ] Add tests for batch operations and integration APIs.
+
+### 8. UI/UX & Accessibility
+- **Goal:** Make the application accessible, modern, and user-friendly on all devices.
+    - [ ] Dark theme and accessibility:
+        - [ ] Add a dark theme and user-selectable color schemes.
+        - [ ] Ensure all UI components meet WCAG accessibility standards (color contrast, keyboard navigation, ARIA labels).
+        - [ ] Add automated accessibility testing to CI pipeline.
+    - [ ] Mobile and responsive design:
+        - [ ] Refactor frontend for improved mobile responsiveness and touch support.
+        - [ ] Design and implement a native mobile app or PWA for core features (chat, repo management, docs).
+        - [ ] Add mobile-specific UI/UX improvements (touch gestures, notifications, etc.).
+    - [ ] Update documentation and screenshots for accessibility and mobile features.
+    - [ ] Add tests for accessibility and mobile UI.
+
+### 9. Enterprise & Advanced Features
+- **Goal:** Support organizational use, extensibility, and robust data management.
+    - [ ] Multi-tenancy and organization support:
+        - [ ] Refactor backend and DB models for multiple organizations/tenants.
+        - [ ] Implement organization management (creation, user assignment, permissions, data isolation).
+        - [ ] Update frontend for organization switching and management.
+        - [ ] Document multi-tenancy features and usage.
+    - [ ] Audit logs and backup/restore:
+        - [ ] Implement comprehensive audit logging for all critical actions (repo changes, user actions, system events).
+        - [ ] Add endpoints and UI for viewing/filtering/searching audit logs.
+        - [ ] Implement backup and restore utilities for all critical data (DB, repos, logs).
+        - [ ] Document audit log and backup/restore procedures.
+    - [ ] Plugin/extension system:
+        - [ ] Design and implement a plugin architecture for third-party extensions (analysis, integrations, UI components).
+        - [ ] Provide developer documentation and examples for building plugins.
+        - [ ] Add UI for managing and enabling/disabling plugins.
+    - [ ] Add tests for all enterprise features and procedures.
+
+---
+
+# Appendix: Completed Features & Achievements
+
 ## ✅ COMPLETED FEATURES
 
 ### Phase 0: Foundation (100% Complete)
@@ -73,114 +272,16 @@
 
 ### ✅ ATOMIC FIXING PLAN - COMPLETED
 
-#### **Phase 1: Investigation & Validation (Safe - No Breaking Changes) - COMPLETED**
-
 ##### Step 1.1: Validate Current State ✅ COMPLETED
-**Objective**: Confirm vector database status and RAG context availability
-**Actions**:
-- ✅ Test vector database population for existing repositories
-- ✅ Verify content indexing service functionality  
-- ✅ Check RAG service context retrieval with test queries
-- ✅ Document current behavior vs expected behavior
-
-**Results**: Confirmed vector database returned 0 elements, chat responses were generic, confirming the issue.
-
 ##### Step 1.2: Backup & Safety Preparation ✅ COMPLETED
-**Objective**: Ensure safe rollback capability
-**Actions**:
-- ✅ Backup current vector database state
-- ✅ Backup repository metadata
-- ✅ Create test repository for safe experimentation
-- ✅ Document current API behavior
-
-**Results**: Comprehensive backups created, safety measures implemented.
-
-#### **Phase 2: Service Integration Fix (Low Risk - Additive Changes) - COMPLETED**
-
 ##### Step 2.1: Add Content Indexing Integration ✅ COMPLETED
-**Objective**: Integrate ContentIndexingService into repository analysis workflow
-**File**: `app/agents/kenobi_agent.py`
-**Actions**:
-- ✅ Import ContentIndexingService in KenobiAgent
-- ✅ Add content indexing call to `analyze_repository()` method
-- ✅ Add progress tracking for indexing process
-- ✅ Add error handling and fallback
-
-**Results**: ContentIndexingService successfully integrated into repository analysis workflow.
-
 ##### Step 2.2: Fix Vector Database Population ✅ COMPLETED
-**Objective**: Ensure vector database gets populated with repository content
-**File**: `app/agents/kenobi_agent.py`
-**Actions**:
-- ✅ Modify `vector_add_repository()` to work with indexed content
-- ✅ Add automatic vector population to `analyze_repository()`
-- ✅ Implement proper error handling and retries
-- ✅ Add logging for debugging
-
-**Results**: Vector database now populated with 167,341 content chunks from 7,385 files.
-
-#### **Phase 3: RAG Service Enhancement (Medium Risk - Modification) - COMPLETED**
-
 ##### Step 3.1: Fix Repository Filtering ✅ COMPLETED
-**Objective**: Enable proper repository-specific search in RAG service
-**File**: `app/services/rag_service.py`
-**Actions**:
-- ✅ Enable repository filtering in vector search
-- ✅ Add fallback to content indexing service
-- ✅ Improve relevance threshold handling
-- ✅ Add detailed logging for debugging
-
-**Results**: RAG service now properly filters and retrieves repository-specific documents.
-
 ##### Step 3.2: Improve Context Quality ✅ COMPLETED
-**Objective**: Enhance context retrieval and prompt construction
-**File**: `app/services/rag_service.py`
-**Actions**:
-- ✅ Improve document chunking strategy
-- ✅ Enhance metadata extraction
-- ✅ Better prompt construction with context
-- ✅ Add context validation
-
-**Results**: Context quality significantly improved with relevant repository content.
-
-#### **Phase 4: Existing Repository Repair (Medium Risk - Data Migration) - COMPLETED**
-
 ##### Step 4.1: Create Repair Endpoint ✅ COMPLETED
-**Objective**: Add endpoint to re-index existing repositories
-**File**: `app/main.py`
-**Actions**:
-- ✅ Create `/kenobi/repositories/{id}/reindex` endpoint
-- ✅ Implement safe re-indexing process
-- ✅ Add progress tracking
-- ✅ Include content and vector indexing
-
-**Results**: Repair endpoint successfully created and tested.
-
-##### Step 4.2: Batch Repair Utility ⚠️ PENDING
-**Objective**: Repair all existing repositories in the system
-**Status**: Not required - individual repair endpoint sufficient for current needs
-
-#### **Phase 5: Validation & Quality Assurance (Low Risk - Testing) - COMPLETED**
-
+##### Step 4.2: Batch Repair Utility ⚠️ PENDING (not required)
 ##### Step 5.1: Comprehensive Testing ✅ COMPLETED
-**Objective**: Validate all fixes work correctly across different scenarios
-**Actions**:
-- ✅ Test with various repository sizes
-- ✅ Test with different programming languages  
-- ✅ Test edge cases and error conditions
-- ✅ Performance testing with large repositories
-
-**Results**: All tests passed, system working correctly across all scenarios.
-
 ##### Step 5.2: User Experience Testing ✅ COMPLETED
-**Objective**: Ensure end-to-end user experience is smooth
-**Actions**:
-- ✅ Test complete workflow: add repo → chat
-- ✅ Test UI responsiveness and feedback
-- ✅ Test error messages and recovery
-- ✅ Test with multiple concurrent users
-
-**Results**: User experience significantly improved with contextual responses.
 
 ### 🎯 IMPLEMENTATION STATUS: COMPLETE
 
@@ -321,23 +422,6 @@ The system is **production-ready** and provides significant value for:
 - **Developers**: AI-powered code analysis and documentation
 - **Teams**: Collaborative repository management and insights
 - **Organizations**: Scalable knowledge management and research
-
-## 🔮 FUTURE ROADMAP
-
-### Short-term (1-2 months)
-- **Performance Monitoring**: Advanced metrics and alerting
-- **User Authentication**: Multi-user support with permissions
-- **Advanced Analytics**: Detailed usage and performance metrics
-
-### Medium-term (3-6 months)
-- **Integration Ecosystem**: API webhooks and third-party integrations
-- **Advanced AI Features**: Code generation and refactoring suggestions
-- **Enterprise Features**: Multi-tenancy and advanced security
-
-### Long-term (6+ months)
-- **Mobile Application**: Native iOS and Android apps
-- **AI Model Training**: Custom models for specific use cases
-- **Marketplace**: Plugin system for community extensions
 
 ---
 
