@@ -1,0 +1,320 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.12, pytest-8.4.1, pluggy-1.6.0 -- /Users/enricopapalini/mambaforge/bin/python
+cachedir: .pytest_cache
+Using --randomly-seed=1997562031
+metadata: {'Python': '3.10.12', 'Platform': 'macOS-15.5-arm64-arm-64bit', 'Packages': {'pytest': '8.4.1', 'pluggy': '1.6.0'}, 'Plugins': {'randomly': '3.16.0', 'anyio': '4.9.0', 'html': '4.1.1', 'asyncio': '1.1.0', 'xdist': '3.8.0', 'timeout': '2.4.0', 'metadata': '3.1.1', 'cov': '6.2.1', 'mock': '3.14.1', 'benchmark': '5.1.0', 'Faker': '37.4.2'}}
+benchmark: 5.1.0 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/enricopapalini/obione
+configfile: pyproject.toml
+plugins: randomly-3.16.0, anyio-4.9.0, html-4.1.1, asyncio-1.1.0, xdist-3.8.0, timeout-2.4.0, metadata-3.1.1, cov-6.2.1, mock-3.14.1, benchmark-5.1.0, Faker-37.4.2
+asyncio: mode=strict, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 28 items / 29 errors
+
+==================================== ERRORS ====================================
+_______ ERROR collecting tests/agents/test_research_service_task_1_1.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/agents/test_research_service_task_1_1.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/agents/test_research_service_task_1_1.py:11: in <module>
+    from app.services.research_service import ResearchService, ResearchStatus, ResearchTask
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/agents/test_research_service_task_1_2.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/agents/test_research_service_task_1_2.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/agents/test_research_service_task_1_2.py:12: in <module>
+    from app.services.research_service import ResearchService, ResearchStatus
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/agents/test_research_service_task_3_1.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/agents/test_research_service_task_3_1.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/agents/test_research_service_task_3_1.py:14: in <module>
+    from app.services.research_service import ResearchService, ResearchTask
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/api/test_backend_integration_task_3_2.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/api/test_backend_integration_task_3_2.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/api/test_backend_integration_task_3_2.py:16: in <module>
+    from app.services.research_service import ResearchService, ResearchStatus
+E   ModuleNotFoundError: No module named 'app'
+______ ERROR collecting tests/api/test_enhanced_api_endpoints_task_3_2.py ______
+ImportError while importing test module '/Users/enricopapalini/obione/tests/api/test_enhanced_api_endpoints_task_3_2.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/api/test_enhanced_api_endpoints_task_3_2.py:24: in <module>
+    from app.main import app
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/api/test_task_1_3_main_initialization.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/api/test_task_1_3_main_initialization.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/api/test_task_1_3_main_initialization.py:15: in <module>
+    from app.main import app, kenobi_agent, app_state
+E   ModuleNotFoundError: No module named 'app'
+______________ ERROR collecting tests/api/test_task_1_3_simple.py ______________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/api/test_task_1_3_simple.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/api/test_task_1_3_simple.py:14: in <module>
+    from app.main import app, app_state, kenobi_agent, startup_event, shutdown_event
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/api/test_task_5_1_frontend_integration.py _______
+ImportError while importing test module '/Users/enricopapalini/obione/tests/api/test_task_5_1_frontend_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/api/test_task_5_1_frontend_integration.py:12: in <module>
+    from app.main import app
+E   ModuleNotFoundError: No module named 'app'
+__________ ERROR collecting tests/e2e/test_critical_functionality.py ___________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/e2e/test_critical_functionality.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/e2e/test_critical_functionality.py:29: in <module>
+    from app.main import app
+E   ModuleNotFoundError: No module named 'app'
+______ ERROR collecting tests/e2e/test_repository_health_and_recovery.py _______
+ImportError while importing test module '/Users/enricopapalini/obione/tests/e2e/test_repository_health_and_recovery.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/e2e/test_repository_health_and_recovery.py:13: in <module>
+    from app.services.repository_service import RepositoryService
+E   ModuleNotFoundError: No module named 'app'
+___ ERROR collecting tests/integration/test_lead_agent_progress_task_2_2.py ____
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_lead_agent_progress_task_2_2.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_lead_agent_progress_task_2_2.py:13: in <module>
+    from app.agents.lead_agent import LeadResearchAgent
+E   ModuleNotFoundError: No module named 'app'
+________ ERROR collecting tests/integration/test_phase_3_integration.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_phase_3_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_phase_3_integration.py:10: in <module>
+    from app.services.vector_database_service import VectorDatabaseService, DocumentType
+E   ModuleNotFoundError: No module named 'app'
+___ ERROR collecting tests/integration/test_progress_data_models_task_2_1.py ___
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_progress_data_models_task_2_1.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_progress_data_models_task_2_1.py:11: in <module>
+    from app.models.schemas import (
+E   ModuleNotFoundError: No module named 'app'
+_ ERROR collecting tests/integration/test_research_service_progress_task_3_1.py _
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_research_service_progress_task_3_1.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_research_service_progress_task_3_1.py:14: in <module>
+    from app.services.research_service import ResearchService, ResearchTask, ResearchStatus
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/integration/test_task_1_1_integration.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_task_1_1_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_task_1_1_integration.py:11: in <module>
+    from app.services.database_service import DatabaseService
+E   ModuleNotFoundError: No module named 'app'
+_____ ERROR collecting tests/integration/test_task_1_2_api_integration.py ______
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_task_1_2_api_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_task_1_2_api_integration.py:11: in <module>
+    from app.services.repository_service import RepositoryService
+E   ModuleNotFoundError: No module named 'app'
+_____ ERROR collecting tests/integration/test_task_2_1_api_integration.py ______
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_task_2_1_api_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_task_2_1_api_integration.py:17: in <module>
+    from app.main import app
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/integration/test_task_4_2_integration.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/integration/test_task_4_2_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/integration/test_task_4_2_integration.py:11: in <module>
+    from app.models.rag_schemas import ChatRequest, ChatResponse, RAGResponse
+E   ModuleNotFoundError: No module named 'app'
+_________ ERROR collecting tests/unit/test_content_indexing_simple.py __________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_content_indexing_simple.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_content_indexing_simple.py:9: in <module>
+    from app.services.content_indexing_service import ContentIndexingService, ContentType
+E   ModuleNotFoundError: No module named 'app'
+______________ ERROR collecting tests/unit/test_research_debug.py ______________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_research_debug.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_research_debug.py:16: in <module>
+    from app.models.schemas import ResearchQuery
+E   ModuleNotFoundError: No module named 'app'
+________ ERROR collecting tests/unit/test_task_1_1_database_service.py _________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_1_1_database_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_1_1_database_service.py:14: in <module>
+    from app.services.database_service import DatabaseService, database_service
+E   ModuleNotFoundError: No module named 'app'
+_______ ERROR collecting tests/unit/test_task_1_2_repository_service.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_1_2_repository_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_1_2_repository_service.py:14: in <module>
+    from app.services.repository_service import RepositoryService
+E   ModuleNotFoundError: No module named 'app'
+______ ERROR collecting tests/unit/test_task_2_1_documentation_service.py ______
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_2_1_documentation_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_2_1_documentation_service.py:14: in <module>
+    from app.services.documentation_service import DocumentationService, DocumentationResult, DocumentationChunk
+E   ModuleNotFoundError: No module named 'app'
+________ ERROR collecting tests/unit/test_task_2_2_analysis_service.py _________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_2_2_analysis_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_2_2_analysis_service.py:20: in <module>
+    from app.services.analysis_service import AnalysisService, CodeSnippet, AnalysisResultData
+E   ModuleNotFoundError: No module named 'app'
+_____ ERROR collecting tests/unit/test_task_3_1_vector_database_service.py _____
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_3_1_vector_database_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_3_1_vector_database_service.py:14: in <module>
+    from app.services.vector_database_service import (
+E   ModuleNotFoundError: No module named 'app'
+____ ERROR collecting tests/unit/test_task_3_2_content_indexing_service.py _____
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_3_2_content_indexing_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_3_2_content_indexing_service.py:15: in <module>
+    from app.services.content_indexing_service import (
+E   ModuleNotFoundError: No module named 'app'
+___________ ERROR collecting tests/unit/test_task_4_1_rag_service.py ___________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_4_1_rag_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_4_1_rag_service.py:11: in <module>
+    from app.services.rag_service import RAGService, ContextDocument
+E   ModuleNotFoundError: No module named 'app'
+________ ERROR collecting tests/unit/test_task_4_2_enhanced_chat_api.py ________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_task_4_2_enhanced_chat_api.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_task_4_2_enhanced_chat_api.py:12: in <module>
+    from app.main import app, enhanced_chat_about_repository, get_enhanced_chat_history, clear_enhanced_chat_history, create_chat_session
+E   ModuleNotFoundError: No module named 'app'
+______________ ERROR collecting tests/unit/test_vector_simple.py _______________
+ImportError while importing test module '/Users/enricopapalini/obione/tests/unit/test_vector_simple.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../mambaforge/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/unit/test_vector_simple.py:6: in <module>
+    from app.services.vector_database_service import VectorDatabaseService, DocumentType
+E   ModuleNotFoundError: No module named 'app'
+=============================== warnings summary ===============================
+tests/templates/test_api_template.py:274
+  /Users/enricopapalini/obione/tests/templates/test_api_template.py:274: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+tests/templates/test_unit_template.py:153
+  /Users/enricopapalini/obione/tests/templates/test_unit_template.py:153: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/templates/test_unit_template.py:172
+  /Users/enricopapalini/obione/tests/templates/test_unit_template.py:172: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR tests/agents/test_research_service_task_1_1.py
+ERROR tests/agents/test_research_service_task_1_2.py
+ERROR tests/agents/test_research_service_task_3_1.py
+ERROR tests/api/test_backend_integration_task_3_2.py
+ERROR tests/api/test_enhanced_api_endpoints_task_3_2.py
+ERROR tests/api/test_task_1_3_main_initialization.py
+ERROR tests/api/test_task_1_3_simple.py
+ERROR tests/api/test_task_5_1_frontend_integration.py
+ERROR tests/e2e/test_critical_functionality.py
+ERROR tests/e2e/test_repository_health_and_recovery.py
+ERROR tests/integration/test_lead_agent_progress_task_2_2.py
+ERROR tests/integration/test_phase_3_integration.py
+ERROR tests/integration/test_progress_data_models_task_2_1.py
+ERROR tests/integration/test_research_service_progress_task_3_1.py
+ERROR tests/integration/test_task_1_1_integration.py
+ERROR tests/integration/test_task_1_2_api_integration.py
+ERROR tests/integration/test_task_2_1_api_integration.py
+ERROR tests/integration/test_task_4_2_integration.py
+ERROR tests/unit/test_content_indexing_simple.py
+ERROR tests/unit/test_research_debug.py
+ERROR tests/unit/test_task_1_1_database_service.py
+ERROR tests/unit/test_task_1_2_repository_service.py
+ERROR tests/unit/test_task_2_1_documentation_service.py
+ERROR tests/unit/test_task_2_2_analysis_service.py
+ERROR tests/unit/test_task_3_1_vector_database_service.py
+ERROR tests/unit/test_task_3_2_content_indexing_service.py
+ERROR tests/unit/test_task_4_1_rag_service.py
+ERROR tests/unit/test_task_4_2_enhanced_chat_api.py
+ERROR tests/unit/test_vector_simple.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 29 errors during collection !!!!!!!!!!!!!!!!!!!
+======================== 3 warnings, 29 errors in 1.20s ========================

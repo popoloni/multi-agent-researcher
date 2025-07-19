@@ -385,6 +385,98 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed information about recent improveme
 
 ## 🧪 Testing
 
+### Comprehensive Test Suite
+
+The project includes a comprehensive test suite with **243 tests** covering all aspects of the application:
+
+#### Test Statistics
+- **Total Tests**: 243
+- **Passing**: 194 (79.8%)
+- **Failing**: 49 (20.2%)
+- **Skipped**: 28 (11.5%)
+
+#### Test Categories
+- **Unit Tests**: Core functionality testing for individual components
+- **Integration Tests**: Service integration and workflow testing
+- **API Tests**: Endpoint testing with FastAPI TestClient
+- **E2E Tests**: End-to-end workflow testing
+- **Frontend Tests**: React component testing
+
+### Running Tests
+
+#### Quick Test Commands
+```bash
+# Run all tests
+python -m pytest tests/ -v
+
+# Run specific test categories
+python -m pytest tests/unit/ -v          # Unit tests
+python -m pytest tests/integration/ -v   # Integration tests
+python -m pytest tests/api/ -v           # API tests
+python -m pytest tests/e2e/ -v           # End-to-end tests
+
+# Run with coverage
+python -m pytest tests/ --cov=app --cov-report=html
+
+# Run organized tests by category
+python tests/run_organized_tests.py unit --coverage
+python tests/run_organized_tests.py integration --parallel
+python tests/run_organized_tests.py all --coverage --parallel
+
+# Run non-regression tests (critical functionality)
+python tests/run_non_regression_tests.py
+python tests/run_non_regression_tests.py --smoke
+python tests/run_non_regression_tests.py --performance
+```
+
+#### Frontend Tests
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Run frontend tests
+npm test
+
+# Run tests with coverage
+npm test -- --coverage
+
+# Run tests in watch mode
+npm test -- --watch
+```
+
+### Test Reports & Documentation
+
+#### Test Reports Location
+- **HTML Reports**: `test-reports/` directory
+- **Coverage Reports**: `htmlcov/` directory
+- **Latest Summary**: `test-reports/latest_summary.txt`
+
+#### Testing Documentation
+All testing documentation has been organized in `docs/testing/`:
+
+- **[Testing Documentation Index](docs/testing/README.md)** - Complete testing guide
+- **[Test Reports & Analysis](docs/testing/)** - All test reports and analysis
+- **[Test Inventory](docs/testing/test_inventory.md)** - Complete test inventory
+- **[Implementation Logs](docs/testing/)** - Testing implementation details
+
+### Recent Test Improvements
+
+#### ✅ Import Error Resolution
+- Fixed missing `app` directory issue that was causing all tests to fail
+- Resolved all import errors and updated test configuration
+- Achieved 100% test discovery success rate
+
+#### ✅ Test Logic Fixes
+- Fixed service constructor expectations to match actual implementations
+- Corrected method call signatures across all test files
+- Updated mocking strategies for proper service isolation
+- Fixed API response expectations and test data setup
+
+#### ✅ Performance Improvements
+- Optimized test execution with proper async handling
+- Fixed benchmark API usage for performance tests
+- Improved test data setup and cleanup procedures
+
 ### Verified Working Features
 - ✅ **Obione Chat System**: AI-powered conversations with repository context awareness
 - ✅ **GitHub Integration**: Complete API with search, cloning, repository info

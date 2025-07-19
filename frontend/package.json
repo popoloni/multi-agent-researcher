@@ -39,6 +39,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:coverage": "react-scripts test --coverage --watchAll=false",
+    "test:watch": "react-scripts test --watch",
+    "test:ci": "react-scripts test --coverage --watchAll=false --ci",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -53,7 +56,27 @@
     ],
     "moduleNameMapper": {
       "^axios$": "axios/dist/node/axios.cjs"
-    }
+    },
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx,ts,tsx}",
+      "!src/**/*.d.ts",
+      "!src/index.js",
+      "!src/reportWebVitals.js",
+      "!src/setupTests.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    },
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ]
   },
   "browserslist": {
     "production": [

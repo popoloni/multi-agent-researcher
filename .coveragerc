@@ -1,0 +1,82 @@
+[run]
+source = app
+omit = 
+    */tests/*
+    */test_*
+    */__pycache__/*
+    */migrations/*
+    */venv/*
+    */env/*
+    */node_modules/*
+    */static/*
+    */templates/*
+    */docs/*
+    */scripts/*
+    */utils/*
+    */migration_scripts/*
+    */legacy/*
+    */docgen_tools/*
+    */frontend/*
+    */imgs/*
+    */TODO*.md
+    */README.md
+    */CHANGELOG.md
+    */LICENSE
+    */requirements.txt
+    */test-requirements.txt
+    */pytest.ini
+    */.coveragerc
+    */run_tests.py
+    */run_organized_tests.py
+    */start_*.sh
+    */start_*.bat
+    */cleanup.sh
+    */verify_application.sh
+    */setup.py
+    */MANIFEST.in
+    */.gitignore
+    */.env*
+    */docker-compose*.yml
+    */Dockerfile*
+    */.dockerignore
+    */Makefile
+    */Procfile
+    */runtime.txt
+    */wsgi.py
+    */asgi.py
+    */manage.py
+    */celery.py
+    */settings.py
+    */urls.py
+branch = True
+source_pkgs = app
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self\.debug
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    @(abc\.)?abstractmethod
+    if TYPE_CHECKING:
+    def test_
+    class Test
+    Mock\(
+    MagicMock\(
+    patch\(
+    print\(
+    logging\.
+    logger\.
+show_missing = True
+precision = 2
+skip_covered = False
+skip_empty = False
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml 

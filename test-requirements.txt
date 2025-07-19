@@ -1,0 +1,40 @@
+# Test-specific dependencies for the Multi-Agent Research System
+# This file contains only testing-related packages
+
+# Core testing framework
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+pytest-html>=3.2.0
+pytest-xdist>=3.3.0
+pytest-timeout>=2.1.0
+pytest-randomly>=3.15.0
+
+# Coverage and reporting
+coverage>=7.3.0
+coverage-badge>=1.1.0
+
+# Test utilities
+factory-boy>=3.3.0
+faker>=19.3.0
+responses>=0.23.0
+httpx>=0.25.0
+
+# Async testing support
+asyncio-mqtt>=0.16.0
+
+# Performance testing
+pytest-benchmark>=4.0.0
+
+# Documentation testing
+# pytest-docstring>=0.1.0  # Removed - not available
+
+# Frontend testing (if needed for backend tests)
+selenium>=4.15.0
+webdriver-manager>=4.0.0
+
+# Code quality for tests
+black>=23.0.0
+flake8>=6.0.0
+isort>=5.12.0 
